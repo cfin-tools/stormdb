@@ -1,6 +1,6 @@
 """
 =========================
-Methods to process data in StormDB layout
+Methods to process data in StormDB layout, including submission to cluster.
 
 Credits:
     Several functions are modified versions from those in mne-python
@@ -22,6 +22,51 @@ from mne.io import Raw
 from mne.bem import fit_sphere_to_headshape
 
 from .access import DBError
+
+QSUB_SCHEMA = """
+#!/bin/bash
+
+# Pass on all environment variables
+#$ -V
+# Operate in current working directory
+#$ -cwd
+#$ -N submit_to_isis
+#$ -o job_scripts/submit_to_isis.output.\$JOB_ID
+#$ -e job_scripts/submit_to_isis.errors.\$JOB_ID
+#$ -q {queue:s}
+{opt_threaded_flag:s}
+
+export OMP_NUM_THREADS=\$NSLOTS
+
+echo "Executing following command on \$NSLOTS threads:"
+echo "{exec_cmd:s}"
+
+{exec_cmd:s}
+
+echo "Done executing"
+
+#qsub submit_job.sh
+#rm submit_job.sh
+"""
+
+
+def submit_to_cluster(exec_cmd, n_jobs=1, queue='short.q'):
+
+    opt_threaded_flag = ""
+    if n_jobs > 1:
+        opt_threaded_flag = "#$ -pe threaded {:d}".format(n_jobs)
+        queue = 'isis.q'
+
+    qsub_script = QSUB_SCHEMA.format(opt_threaded_flag=opt_threaded_flag,
+                                     queue=queue, exec_cmd=exec_cmd)
+
+    # st = os.system(qsub_script)
+    # if st != 0:
+    #     raise RuntimeError('qsub returned non-zero '
+    #                        'exit status {:d}'.format(st))
+    # print(qsub_script)
+
+    # ship to qsub via shell, somehow?
 
 
 class Maxfilter():
@@ -301,7 +346,7 @@ class Maxfilter():
         self.info['cmd'] += [cmd]
         self.info['io_mapping'] += [dict(input=in_fname, output=out_fname)]
 
-    def submit_to_isis(self, n_jobs=1, fake=False, submit_script=None):
+    def submit_to_cluster(self, n_jobs=1, fake=False, submit_script=None):
         """ Submit the command built before for processing on the cluster.
 
         Things to implement
@@ -314,34 +359,16 @@ class Maxfilter():
         fake : bool
             If true, run a fake run, just print the command that will be
             submitted.
-        submit_script : str or None
-            Full path to script handling submission. If None (default),
-            the default script is used:
-            /usr/local/common/meeg-cfin/configurations/bin/submit_to_isis
-
         """
         if len(self.info['cmd']) < 1:
             raise NameError('cmd to submit is not defined yet')
-
-        _check_n_jobs(n_jobs)
-        if submit_script is None:
-            submit_script = \
-                '/usr/local/common/meeg-cfin/configurations/bin/submit_to_isis'
-
-        if os.system(submit_script + ' 2>&1 > /dev/null') >> 8 == 127:
-            raise NameError('submit script ' + submit_script + ' not found')
 
         for ic, cmd in enumerate(self.info['cmd']):
             if not fake:
                 self.logger.info('Submitting command:\n{:s}'.format(cmd))
 
-                submit_cmd = ' '.join((submit_script,
-                                       '{:d}'.format(n_jobs),
-                                       '\"' + cmd + '\"'))  # quotes for safety
-                st = os.system(submit_cmd)
-                if st != 0:
-                    raise RuntimeError('qsub returned non-zero '
-                                       'exit status {:d}'.format(st))
+                submit_to_cluster(cmd, n_jobs=n_jobs, queue='isis.q')
+
                 self.info['cmd'] = []  # clear list for next round
                 self.info['io_mapping'] = []  # clear list for next round
             else:
