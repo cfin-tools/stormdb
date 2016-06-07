@@ -29,18 +29,18 @@ QSUB_SCHEMA = """
 # Pass on all environment variables
 #$ -V
 # Operate in current working directory
-{cwd:s}
+{cwd_flag:s}
 #$ -N {job_name:s}
-#$ -o {job_name:s}_\$JOB_ID.qsub
+#$ -o {job_name:s}_$JOB_ID.qsub
 # Merge stdout and stderr
-#$ -j oe
+#$ -j y
 #$ -q {queue:s}
 {opt_threaded_flag:s}
 
 # Make sure process uses max requested number of threads!
-export OMP_NUM_THREADS=\$NSLOTS
+export OMP_NUM_THREADS=$NSLOTS
 
-echo "Executing following command on \$NSLOTS threads:"
+echo "Executing following command on $NSLOTS threads:"
 echo "{exec_cmd:s}"
 
 {exec_cmd:s}
@@ -52,11 +52,12 @@ def _format_qsub_schema(exec_cmd, queue, job_name, cwd_flag,
                         opt_threaded_flag):
     """All variables should be defined"""
     if (exec_cmd is None or queue is None or job_name is None or
-            opt_threaded_flag is None):
+            cwd_flag is None or opt_threaded_flag is None):
         raise ValueError('This should not happen! Contact cjb@cfin.au.dk')
 
     return QSUB_SCHEMA.format(opt_threaded_flag=opt_threaded_flag,
-                              queue=queue, exec_cmd=exec_cmd, name=job_name)
+                              cwd_flag=cwd_flag, queue=queue,
+                              exec_cmd=exec_cmd, job_name=job_name)
 
 def _write_qsub_job(qsub_script, sh_file='submit_job.sh'):
     """Write temp .sh"""
@@ -68,12 +69,15 @@ def _delete_qsub_job(sh_file='submit_job.sh'):
     os.unlink(sh_file)
 
 def submit_to_cluster(exec_cmd, n_jobs=1, queue='short.q', cwd=True,
-                      job_name=None):
+                      job_name=None, cleanup=True):
 
     opt_threaded_flag = ""
+    cwd_flag = ''
     if n_jobs > 1:
         opt_threaded_flag = "#$ -pe threaded {:d}".format(n_jobs)
-        queue = 'isis.q'
+        if not queue == 'isis.q':
+            raise ValueError('Make sure you use a parallel queue when '
+                             'submitting jobs with multiple threads.')
     if job_name is None:
         job_name = 'py-wrapper'
     if cwd:
@@ -82,16 +86,20 @@ def submit_to_cluster(exec_cmd, n_jobs=1, queue='short.q', cwd=True,
     qsub_script = _format_qsub_schema(exec_cmd, queue, job_name, cwd_flag,
                                       opt_threaded_flag)
 
-    # st = os.system(qsub_script)
-    # if st != 0:
-    #     raise RuntimeError('qsub returned non-zero '
-    #                        'exit status {:d}'.format(st))
-    # print(qsub_script)
-
-    # ship to qsub via shell, somehow?
     _write_qsub_job(qsub_script)
-    subp.check_call(['echo', 'qsub', 'submit_job.sh'])
-    # _delete_qsub_job()
+    try:
+        output = subp.check_output(['qsub', 'submit_job.sh'],
+                                   stderr=subp.STDOUT, shell=False)
+        # subp.check_output(['ls', 'nonexistentfile.sh'], stderr=subp.STDOUT,
+        #                   shell=False)
+    except subp.CalledProcessError as cpe:
+        raise RuntimeError('qsub submission failed with error code '
+                           '{:d}, output is:\n\n{:s}'.format(cpe.returncode,
+                                                             cpe.output))
+    else:
+        print(output.rstrip())
+        if cleanup:
+            _delete_qsub_job()
 
 
 class Maxfilter():
