@@ -29,13 +29,15 @@ QSUB_SCHEMA = """
 # Pass on all environment variables
 #$ -V
 # Operate in current working directory
-#$ -cwd
-#$ -N submit_to_isis
-#$ -o job_scripts/submit_to_isis.output.\$JOB_ID
-#$ -e job_scripts/submit_to_isis.errors.\$JOB_ID
+{cwd:s}
+#$ -N {job_name:s}
+#$ -o {job_name:s}_\$JOB_ID.qsub
+# Merge stdout and stderr
+#$ -j oe
 #$ -q {queue:s}
 {opt_threaded_flag:s}
 
+# Make sure process uses max requested number of threads!
 export OMP_NUM_THREADS=\$NSLOTS
 
 echo "Executing following command on \$NSLOTS threads:"
@@ -44,21 +46,41 @@ echo "{exec_cmd:s}"
 {exec_cmd:s}
 
 echo "Done executing"
-
-#qsub submit_job.sh
-#rm submit_job.sh
 """
 
+def _format_qsub_schema(exec_cmd, queue, job_name, cwd_flag,
+                        opt_threaded_flag):
+    """All variables should be defined"""
+    if (exec_cmd is None or queue is None or job_name is None or
+            opt_threaded_flag is None):
+        raise ValueError('This should not happen! Contact cjb@cfin.au.dk')
 
-def submit_to_cluster(exec_cmd, n_jobs=1, queue='short.q'):
+    return QSUB_SCHEMA.format(opt_threaded_flag=opt_threaded_flag,
+                              queue=queue, exec_cmd=exec_cmd, name=job_name)
+
+def _write_qsub_job(qsub_script, sh_file='submit_job.sh'):
+    """Write temp .sh"""
+    with open(sh_file, 'w') as bash_file:
+        bash_file.writelines(qsub_script)
+
+def _delete_qsub_job(sh_file='submit_job.sh'):
+    """Delete temp .sh"""
+    os.unlink(sh_file)
+
+def submit_to_cluster(exec_cmd, n_jobs=1, queue='short.q', cwd=True,
+                      job_name=None):
 
     opt_threaded_flag = ""
     if n_jobs > 1:
         opt_threaded_flag = "#$ -pe threaded {:d}".format(n_jobs)
         queue = 'isis.q'
+    if job_name is None:
+        job_name = 'py-wrapper'
+    if cwd:
+        cwd_flag = '#$ -cwd'
 
-    qsub_script = QSUB_SCHEMA.format(opt_threaded_flag=opt_threaded_flag,
-                                     queue=queue, exec_cmd=exec_cmd)
+    qsub_script = _format_qsub_schema(exec_cmd, queue, job_name, cwd_flag,
+                                      opt_threaded_flag)
 
     # st = os.system(qsub_script)
     # if st != 0:
@@ -67,6 +89,9 @@ def submit_to_cluster(exec_cmd, n_jobs=1, queue='short.q'):
     # print(qsub_script)
 
     # ship to qsub via shell, somehow?
+    _write_qsub_job(qsub_script)
+    subp.check_call(['echo', 'qsub', 'submit_job.sh'])
+    # _delete_qsub_job()
 
 
 class Maxfilter():
@@ -347,7 +372,7 @@ class Maxfilter():
         self.info['io_mapping'] += [dict(input=in_fname, output=out_fname)]
 
     def submit_to_cluster(self, n_jobs=1, fake=False, submit_script=None):
-        """ Submit the command built before for processing on the cluster.
+        """ Submit the command built earlier for processing on the cluster.
 
         Things to implement
         * check output?
@@ -367,7 +392,8 @@ class Maxfilter():
             if not fake:
                 self.logger.info('Submitting command:\n{:s}'.format(cmd))
 
-                submit_to_cluster(cmd, n_jobs=n_jobs, queue='isis.q')
+                submit_to_cluster(cmd, n_jobs=n_jobs, queue='isis.q',
+                                  job_name='maxfilter')
 
                 self.info['cmd'] = []  # clear list for next round
                 self.info['io_mapping'] = []  # clear list for next round
