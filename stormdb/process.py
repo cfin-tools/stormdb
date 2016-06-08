@@ -474,21 +474,26 @@ class FS_recon():
 
             included_subjects = db.get_subjects()
 
-            for subject in included_subjects:
+            for subject in included_subjects[:-1]:
                 # this is an example of getting the DICOM files as a list
                 mr_study = db.get_studies(subject, modality='MR', unique=True)
-                if mr_study is not None:
+                if len(mr_study) > 0:
                     # This is a 2D list with [series_name, series_number]
                     series = db.get_series(subject,
                                            mr_study[0],
                                            'MR')
+                    print(series)
+                    if series.has_key("t1_mprage_3D_sag"):
                 # ### matches sequence_name
-                T1_file_names = db.get_files(subject, mr_study[0], 'MR',
-                                             series)
-
-                cmd = "recon-all -all -subjid %s -i %s" % (subject,
-                                                           T1_file_names)
-                self.info["cmd"] += [cmd]
+                        T1_file_names = db.get_files(subject, mr_study[0], 'MR',
+                                                     series["t1_mprage_3D_sag"])   
+                    elif  series.has_key("t1_mpr_sag_weakFS"):
+                        T1_file_names = db.get_files(subject, mr_study[0], 'MR',
+                                                     series["t1_mpr_sag_weakFS"])   
+                                                     
+                        cmd = "recon-all -all -subjid %s -i %s" % (subject,
+                                                                   T1_file_names[0])
+                        self.info["cmd"] += [cmd]
 
 
 def _check_n_jobs(n_jobs):
