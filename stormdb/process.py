@@ -480,8 +480,7 @@ class FS_recon():
                     # This is a 2D list with [series_name, series_number]
                     series = db.get_series(subject,
                                            mr_study[0],
-                                           'MR',
-                                           verbose=True)
+                                           'MR')
                 # ### matches sequence_name
                 T1_file_names = db.get_files(subject, mr_study[0], 'MR',
                                              series)
