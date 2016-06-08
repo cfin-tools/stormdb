@@ -474,7 +474,7 @@ class FS_recon():
         os.environ["SUBJECTS_DIR"] = fs_subjects_dir
 
     def all_subjects(self):
-        db = Query(self.proj_code)
+        db = Query(self.info["proj_code"])
 
         included_subjects = db.get_subjects()
 
