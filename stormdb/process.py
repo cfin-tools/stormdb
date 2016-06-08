@@ -446,7 +446,7 @@ class Maxfilter():
                     'output']))
 
 
-class FS_recon():
+class FS_reconstruction():
     """ Object for FreeSurfer recon-all data from database into StormDB filesystem
 
        Things to implement
@@ -469,8 +469,8 @@ class FS_recon():
         else:
             self.logger.setLevel(logging.ERROR)
 
-        proj_folder = os.path.join('/projects', proj_code)
-        fs_subjects_dir = os.path.join(proj_folder, "/fs_subjects_dir")
+        fs_subjects_dir = os.oath.join("/projects", proj_code,
+                                       "/fs_subjects_dir")
         os.environ["SUBJECTS_DIR"] = fs_subjects_dir
 
     def all_subjects(self):
