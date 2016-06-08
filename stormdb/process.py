@@ -447,7 +447,11 @@ class Maxfilter():
 
 
 class FS_recon():
-    """Docs goes here."""
+    """ Object for FreeSurfer recon-all data from database into StormDB filesystem
+
+       Things to implement
+       * Better way to get t1 names
+    """
 
     def __init__(self, proj_code, verbose=True):
         if not os.path.exists('/projects/' + proj_code):
@@ -469,31 +473,63 @@ class FS_recon():
         fs_subjects_dir = os.path.join(proj_folder, "/fs_subjects_dir")
         os.environ["SUBJECTS_DIR"] = fs_subjects_dir
 
-    def setup_for_all_subjects(self, proj_code, n_jobs=1):
-            db = Query(proj_code)
+    def all_subjects(self):
+        db = Query(self.proj_code)
 
-            included_subjects = db.get_subjects()
+        included_subjects = db.get_subjects()
 
-            for subject in included_subjects[:-1]:
-                # this is an example of getting the DICOM files as a list
-                mr_study = db.get_studies(subject, modality='MR', unique=True)
-                if len(mr_study) > 0:
-                    # This is a 2D list with [series_name, series_number]
-                    series = db.get_series(subject,
-                                           mr_study[0],
-                                           'MR')
-                    print(series)
-                    if series.has_key("t1_mprage_3D_sag"):
-                # ### matches sequence_name
-                        T1_file_names = db.get_files(subject, mr_study[0], 'MR',
-                                                     series["t1_mprage_3D_sag"])   
-                    elif  series.has_key("t1_mpr_sag_weakFS"):
-                        T1_file_names = db.get_files(subject, mr_study[0], 'MR',
-                                                     series["t1_mpr_sag_weakFS"])   
-                                                     
-                        cmd = "recon-all -all -subjid %s -i %s" % (subject,
-                                                                   T1_file_names[0])
-                        self.info["cmd"] += [cmd]
+        for subject in included_subjects[:-1]:
+            # this is an example of getting the DICOM files as a list
+            mr_study = db.get_studies(subject, modality='MR', unique=True)
+            if len(mr_study) > 0:
+                # This is a 2D list with [series_name, series_number]
+                series = db.get_series(subject, mr_study[0], 'MR')
+
+                if "t1_mprage_3D_sag" in series:
+                    # ### matches sequence_name
+                    T1_file_names = db.get_files(subject, mr_study[0], 'MR',
+                                                 series["t1_mprage_3D_sag"])
+                elif "t1_mpr_sag_weakFS" in series:
+                    T1_file_names = db.get_files(subject, mr_study[0], 'MR',
+                                                 series["t1_mpr_sag_weakFS"])
+
+                    cmd = "recon-all -all -subjid %s -i %s" % (
+                        subject, T1_file_names[0])
+                    self.info["cmd"] += [cmd]
+
+    def submit_to_cluster(self, n_jobs=1, fake=False, submit_script=None):
+        """ Submit the command built earlier for processing on the cluster.
+
+        Things to implement
+        * check output?
+
+        Parameters
+        ----------
+        n_jobs : int
+            Number of parallel threads to allow (Intel MKL). Max 12!
+        fake : bool
+            If true, run a fake run, just print the command that will be
+            submitted.
+        """
+        if len(self.info['cmd']) < 1:
+            raise NameError('cmd to submit is not defined yet')
+
+        for ic, cmd in enumerate(self.info['cmd']):
+            if not fake:
+                self.logger.info('Submitting command:\n{:s}'.format(cmd))
+
+                submit_to_cluster(cmd,
+                                  n_jobs=n_jobs,
+                                  queue='all.q',
+                                  job_name='FS_recon')
+
+                self.info['cmd'] = []  # clear list for next round
+                self.info['io_mapping'] = []  # clear list for next round
+            else:
+                print('{:d}: {:s}'.format(ic + 1, self.info['io_mapping'][ic][
+                    'input']))
+                print('\t-->{:s}'.format(self.info['io_mapping'][ic][
+                    'output']))
 
 
 def _check_n_jobs(n_jobs):
