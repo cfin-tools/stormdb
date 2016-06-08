@@ -465,11 +465,12 @@ class FS_recon():
         else:
             self.logger.setLevel(logging.ERROR)
 
+        proj_folder = os.path.join('/projects', proj_code)
+        fs_subjects_dir = os.path.join(proj_folder, "/fs_subjects_dir")
+        os.environ["SUBJECTS_DIR"] = fs_subjects_dir
+
     def setup_for_all_subjects(self, proj_code, n_jobs=1):
             db = Query(proj_code)
-            proj_folder = os.path.join('/projects', proj_code)
-            fs_subjects_dir = os.path.join(proj_folder, "/fs_subjects_dir")
-            os.environ["SUBJECTS_DIR"] = fs_subjects_dir
 
             included_subjects = db.get_subjects()
 
