@@ -21,7 +21,7 @@ import subprocess as subp
 from mne.io import Raw
 from mne.bem import fit_sphere_to_headshape
 
-from .access import DBError
+from .access import DBError, Query
 
 QSUB_SCHEMA = """
 #!/bin/bash
@@ -48,6 +48,7 @@ echo "{exec_cmd:s}"
 echo "Done executing"
 """
 
+
 def _format_qsub_schema(exec_cmd, queue, job_name, cwd_flag,
                         opt_threaded_flag):
     """All variables should be defined"""
@@ -56,20 +57,29 @@ def _format_qsub_schema(exec_cmd, queue, job_name, cwd_flag,
         raise ValueError('This should not happen! Contact cjb@cfin.au.dk')
 
     return QSUB_SCHEMA.format(opt_threaded_flag=opt_threaded_flag,
-                              cwd_flag=cwd_flag, queue=queue,
-                              exec_cmd=exec_cmd, job_name=job_name)
+                              cwd_flag=cwd_flag,
+                              queue=queue,
+                              exec_cmd=exec_cmd,
+                              job_name=job_name)
+
 
 def _write_qsub_job(qsub_script, sh_file='submit_job.sh'):
     """Write temp .sh"""
     with open(sh_file, 'w') as bash_file:
         bash_file.writelines(qsub_script)
 
+
 def _delete_qsub_job(sh_file='submit_job.sh'):
     """Delete temp .sh"""
     os.unlink(sh_file)
 
-def submit_to_cluster(exec_cmd, n_jobs=1, queue='short.q', cwd=True,
-                      job_name=None, cleanup=True):
+
+def submit_to_cluster(exec_cmd,
+                      n_jobs=1,
+                      queue='short.q',
+                      cwd=True,
+                      job_name=None,
+                      cleanup=True):
 
     opt_threaded_flag = ""
     cwd_flag = ''
@@ -88,8 +98,10 @@ def submit_to_cluster(exec_cmd, n_jobs=1, queue='short.q', cwd=True,
 
     _write_qsub_job(qsub_script)
     try:
-        output = subp.check_output(['qsub', 'submit_job.sh'],
-                                   stderr=subp.STDOUT, shell=False)
+        output = subp.check_output(
+            ['qsub', 'submit_job.sh'],
+            stderr=subp.STDOUT,
+            shell=False)
         # subp.check_output(['ls', 'nonexistentfile.sh'], stderr=subp.STDOUT,
         #                   shell=False)
     except subp.CalledProcessError as cpe:
@@ -126,8 +138,7 @@ class Maxfilter():
         if not os.path.exists('/projects/' + proj_code):
             raise DBError('No such project!')
 
-        self.info = dict(proj_code=proj_code, bad=bad, cmd=[],
-                         io_mapping=[])
+        self.info = dict(proj_code=proj_code, bad=bad, cmd=[], io_mapping=[])
         # Consider placing other vars here
 
         self.logger = logging.getLogger('__name__')
@@ -139,8 +150,12 @@ class Maxfilter():
         else:
             self.logger.setLevel(logging.ERROR)
 
-    def detect_bad_chans_xscan(self, in_fname, use_tsss=False, n_jobs=1,
-                               xscan_bin=None, set_bad=True):
+    def detect_bad_chans_xscan(self,
+                               in_fname,
+                               use_tsss=False,
+                               n_jobs=1,
+                               xscan_bin=None,
+                               set_bad=True):
         """Experimental method from Elekta for detecting bad channels
 
         WARNING! Use at own risk, not documented/fully tested!
@@ -180,7 +195,7 @@ class Maxfilter():
         # CHECKME!
         bads_str = []
         for il in range(2):
-            row = stdout[-1*il]
+            row = stdout[-1 * il]
             idx = row.find('Static')
             if idx > 0 and ('flat' in row or 'bad' in row):
                 idx = row.find('): ')
@@ -194,16 +209,31 @@ class Maxfilter():
             self.info['bad'] = uniq_bads
             self.logger.info('Maxfilter object bad channel list updated')
 
-    def build_maxfilter_cmd(self, in_fname, out_fname, origin='0 0 40',
-                            frame='head', bad=None, autobad='off', skip=None,
-                            force=False, st=False, st_buflen=16.0,
-                            st_corr=0.96, trans=None, movecomp=False,
-                            headpos=False, hp=None, hpistep=None,
-                            hpisubt=None, hpicons=True, linefreq=None,
-                            cal=None, ctc=None, mx_args='',
+    def build_maxfilter_cmd(self,
+                            in_fname,
+                            out_fname,
+                            origin='0 0 40',
+                            frame='head',
+                            bad=None,
+                            autobad='off',
+                            skip=None,
+                            force=False,
+                            st=False,
+                            st_buflen=16.0,
+                            st_corr=0.96,
+                            trans=None,
+                            movecomp=False,
+                            headpos=False,
+                            hp=None,
+                            hpistep=None,
+                            hpisubt=None,
+                            hpicons=True,
+                            linefreq=None,
+                            cal=None,
+                            ctc=None,
+                            mx_args='',
                             maxfilter_bin='/neuro/bin/util/maxfilter',
                             logfile=None):
-
         """Build a NeuroMag MaxFilter command for later execution.
 
         See the Maxfilter manual for details on the different options!
@@ -284,10 +314,12 @@ class Maxfilter():
             raw.close()
 
             self.logger.info('Fitted sphere: r = {.1f} mm'.format(r))
-            self.logger.info('Origin head coordinates: {.1f} {.1f} {.1f} mm'.
-                             format(o_head[0], o_head[1], o_head[2]))
-            self.logger.info('Origin device coordinates: {.1f} {.1f} {.1f} mm'.
-                             format(o_dev[0], o_dev[1], o_dev[2]))
+            self.logger.info(
+                'Origin head coordinates: {.1f} {.1f} {.1f} mm'.format(o_head[
+                    0], o_head[1], o_head[2]))
+            self.logger.info(
+                'Origin device coordinates: {.1f} {.1f} {.1f} mm'.format(o_dev[
+                    0], o_dev[1], o_dev[2]))
 
             self.logger.info('[done]')
             if frame == 'head':
@@ -298,14 +330,14 @@ class Maxfilter():
                 RuntimeError('invalid frame for origin')
 
         # Start building command
-        cmd = (maxfilter_bin + ' -f {:s} -o {:s} -v '.format(in_fname,
-                                                             out_fname))
+        cmd = (
+            maxfilter_bin + ' -f {:s} -o {:s} -v '.format(in_fname, out_fname))
 
         if isinstance(origin, (np.ndarray, list, tuple)):
-            origin = '{:.1f} {:.1f} {:.1f}'.format(origin[0],
-                                                   origin[1], origin[2])
+            origin = '{:.1f} {:.1f} {:.1f}'.format(origin[0], origin[1],
+                                                   origin[2])
         elif not isinstance(origin, str):
-            raise(ValueError('origin must be list-like or string'))
+            raise (ValueError('origin must be list-like or string'))
 
         cmd += ' -frame {:s} -origin {:s} -v '.format(frame, origin)
 
@@ -328,8 +360,8 @@ class Maxfilter():
 
         if skip is not None:
             if isinstance(skip, list):
-                skip = ' '.join(['{:.3f} {:.3f}'.format(s[0], s[1])
-                                for s in skip])
+                skip = ' '.join(['{:.3f} {:.3f}'.format(s[0], s[1]) for s in
+                                 skip])
             cmd += '-skip {:s} '.format(skip)
 
         if force:
@@ -400,15 +432,63 @@ class Maxfilter():
             if not fake:
                 self.logger.info('Submitting command:\n{:s}'.format(cmd))
 
-                submit_to_cluster(cmd, n_jobs=n_jobs, queue='isis.q',
+                submit_to_cluster(cmd,
+                                  n_jobs=n_jobs,
+                                  queue='isis.q',
                                   job_name='maxfilter')
 
                 self.info['cmd'] = []  # clear list for next round
                 self.info['io_mapping'] = []  # clear list for next round
             else:
-                print('{:d}: {:s}'.format(ic + 1,
-                                          self.info['io_mapping'][ic]['input']))
-                print('\t-->{:s}'.format(self.info['io_mapping'][ic]['output']))
+                print('{:d}: {:s}'.format(ic + 1, self.info['io_mapping'][ic][
+                    'input']))
+                print('\t-->{:s}'.format(self.info['io_mapping'][ic][
+                    'output']))
+
+
+class FS_recon():
+    """Docs goes here."""
+
+    def __init__(self, proj_code, verbose=True):
+        if not os.path.exists('/projects/' + proj_code):
+            raise DBError('No such project!')
+
+        self.info = dict(proj_code=proj_code, cmd=[], io_mapping=[])
+        # Consider placing other vars here
+
+        self.logger = logging.getLogger('__name__')
+        self.logger.propagate = False
+        stdout_stream = logging.StreamHandler(sys.stdout)
+        self.logger.addHandler(stdout_stream)
+        if verbose:
+            self.logger.setLevel(logging.INFO)
+        else:
+            self.logger.setLevel(logging.ERROR)
+
+        def setup_for_all_subjects(self, proj_code, n_jobs=1):
+            db = Query(proj_code)
+            proj_folder = os.path.join('/projects', proj_code)
+            fs_subjects_dir = os.path.join(proj_folder, "/fs_subjects_dir")
+            os.environ["SUBJECTS_DIR"] = fs_subjects_dir
+
+            included_subjects = db.get_subjects()
+
+            for subject in included_subjects:
+                # this is an example of getting the DICOM files as a list
+                mr_study = db.get_studies(subject, modality='MR', unique=True)
+                if mr_study is not None:
+                    # This is a 2D list with [series_name, series_number]
+                    series = db.get_series(subject,
+                                           mr_study[0],
+                                           'MR',
+                                           verbose=True)
+                # ### matches sequence_name
+                T1_file_names = db.get_files(subject, mr_study[0], 'MR',
+                                             series)
+
+                cmd = "recon-all -all -subjid %s -i %s" % (subject,
+                                                           T1_file_names)
+                self.info["cmd"] += [cmd]
 
 
 def _check_n_jobs(n_jobs):
