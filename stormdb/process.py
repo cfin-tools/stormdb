@@ -507,6 +507,7 @@ class FS_reconstruction():
             raise ValueError("No such project!Subject exist in" +
                              "fs_subjects_dir! \nPlease delete" +
                              "or rename subject.")
+
         db = Query(self.info["proj_code"])
         # TODO: Add test that subject name is in stormdb
 
@@ -525,6 +526,8 @@ class FS_reconstruction():
                 print("\nProblen with T1 for subject: %s" % subject,
                       "Either none or multiple T1\'s "
                       "present for subject")
+        else:
+            print("No MR for subject: %s" % subject)
 
     def submit_to_cluster(self, n_jobs=1, fake=False, submit_script=None):
         """ Submit the command built earlier for processing on the cluster.
