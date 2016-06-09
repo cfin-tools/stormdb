@@ -449,14 +449,14 @@ class FS_reconstruction():
     """ Object for FreeSurfer recon-all data from database into StormDB filesystem
 
        Things to implement
-       * Better way to get t1 names
+       * single sbuject, with force param
     """
 
     def __init__(self, proj_code, verbose=True):
         if not os.path.exists('/projects/' + proj_code):
             raise DBError('No such project!')
 
-        self.info = dict(proj_code=proj_code, cmd=[], io_mapping=[])
+        self.info = dict(proj_code=proj_code, cmd=[])
         # Consider placing other vars here
 
         self.logger = logging.getLogger('__name__')
@@ -468,8 +468,8 @@ class FS_reconstruction():
         else:
             self.logger.setLevel(logging.ERROR)
 
-        fs_subjects_dir = os.oath.join("/projects", proj_code,
-                                       "/fs_subjects_dir")
+        fs_subjects_dir = os.path.join("/projects", proj_code,
+                                       "scratch/fs_subjects_dir")
         os.environ["SUBJECTS_DIR"] = fs_subjects_dir
 
     def all_subjects(self):
@@ -482,20 +482,12 @@ class FS_reconstruction():
             mr_study = db.get_studies(subject, modality='MR', unique=True)
             if len(mr_study) > 0:
                 # This is a 2D list with [series_name, series_number]
-                series = db.filter_series(description="t1*",
+                series = db.filter_series(description="t1*FS",
                                           subj_ids=subject,
                                           modalities="MR")
-
-                if "t1_mprage_3D_sag" in series:
-                    # ### matches sequence_name
-                    T1_file_names = db.get_files(subject, mr_study[0], 'MR',
-                                                 series["t1_mprage_3D_sag"])
-                elif "t1_mpr_sag_weakFS" in series:
-                    T1_file_names = db.get_files(subject, mr_study[0], 'MR',
-                                                 series["t1_mpr_sag_weakFS"])
-
+                if len(series) > 0:
                     cmd = "recon-all -all -subjid %s -i %s" % (
-                        subject, T1_file_names[0])
+                        subject, series[0]["path"]+ "/" + series[0]["files"][0])
                     self.info["cmd"] += [cmd]
 
     def submit_to_cluster(self, n_jobs=1, fake=False, submit_script=None):
@@ -515,22 +507,19 @@ class FS_reconstruction():
         if len(self.info['cmd']) < 1:
             raise NameError('cmd to submit is not defined yet')
 
-        for ic, cmd in enumerate(self.info['cmd']):
+        for cmd in self.info['cmd']:          
             if not fake:
                 self.logger.info('Submitting command:\n{:s}'.format(cmd))
 
                 submit_to_cluster(cmd,
                                   n_jobs=n_jobs,
-                                  queue='all.q',
+                                  queue='isis.q',
                                   job_name='FS_recon')
 
-                self.info['cmd'] = []  # clear list for next round
-                self.info['io_mapping'] = []  # clear list for next round
+                self.info['cmd'] = []  # clear list for next roun
             else:
-                print('{:d}: {:s}'.format(ic + 1, self.info['io_mapping'][ic][
-                    'input']))
-                print('\t-->{:s}'.format(self.info['io_mapping'][ic][
-                    'output']))
+                print(self.info["cmd"])
+                
 
 
 def _check_n_jobs(n_jobs):
