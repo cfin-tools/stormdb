@@ -485,15 +485,15 @@ class FS_reconstruction():
                 series = db.filter_series(description="t1*",
                                           subj_ids=subject,
                                           modalities="MR")
-                if len(series) == 1:
+                if len(series) == 1:  # TODO: make more pythonic
                     cmd = "recon-all -all -subjid %s -i %s" % (
                         subject,
                         series[0]["path"] + "/" + series[0]["files"][0])
                     self.info["cmd"] += [cmd]
                 else:
-                    raise ValueError(
-                        'Problen with T1'
-                        'Either none present for subject or multiple')
+                    print ("\nProblen with T1 for subject: %s" % subject,
+                           "Either none or multiple T1\'s "
+                                     "present for subject")
 
     def submit_to_cluster(self, n_jobs=1, fake=False, submit_script=None):
         """ Submit the command built earlier for processing on the cluster.
