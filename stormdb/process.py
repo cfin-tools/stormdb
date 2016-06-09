@@ -493,7 +493,10 @@ class FS_reconstruction():
                 else:
                     print ("\nProblen with T1 for subject: %s" % subject,
                            "Either none or multiple T1\'s "
-                                     "present for subject")
+                           "present for subject")
+
+    def single_subject(self):
+        pass
 
     def submit_to_cluster(self, n_jobs=1, fake=False, submit_script=None):
         """ Submit the command built earlier for processing on the cluster.
