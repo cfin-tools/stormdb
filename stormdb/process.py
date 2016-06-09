@@ -98,10 +98,9 @@ def submit_to_cluster(exec_cmd,
 
     _write_qsub_job(qsub_script)
     try:
-        output = subp.check_output(
-            ['qsub', 'submit_job.sh'],
-            stderr=subp.STDOUT,
-            shell=False)
+        output = subp.check_output(['qsub', 'submit_job.sh'],
+                                   stderr=subp.STDOUT,
+                                   shell=False)
         # subp.check_output(['ls', 'nonexistentfile.sh'], stderr=subp.STDOUT,
         #                   shell=False)
     except subp.CalledProcessError as cpe:
@@ -360,8 +359,8 @@ class Maxfilter():
 
         if skip is not None:
             if isinstance(skip, list):
-                skip = ' '.join(['{:.3f} {:.3f}'.format(s[0], s[1]) for s in
-                                 skip])
+                skip = ' '.join(['{:.3f} {:.3f}'.format(s[0], s[1])
+                                 for s in skip])
             cmd += '-skip {:s} '.format(skip)
 
         if force:
@@ -483,7 +482,9 @@ class FS_reconstruction():
             mr_study = db.get_studies(subject, modality='MR', unique=True)
             if len(mr_study) > 0:
                 # This is a 2D list with [series_name, series_number]
-                series = db.get_series(subject, mr_study[0], 'MR')
+                series = db.filter_series(description="t1*",
+                                          subj_ids=subject,
+                                          modalities="MR")
 
                 if "t1_mprage_3D_sag" in series:
                     # ### matches sequence_name
