@@ -482,13 +482,18 @@ class FS_reconstruction():
             mr_study = db.get_studies(subject, modality='MR', unique=True)
             if len(mr_study) > 0:
                 # This is a 2D list with [series_name, series_number]
-                series = db.filter_series(description="t1*FS",
+                series = db.filter_series(description="t1*",
                                           subj_ids=subject,
                                           modalities="MR")
-                if len(series) > 0:
+                if len(series) == 1:
                     cmd = "recon-all -all -subjid %s -i %s" % (
-                        subject, series[0]["path"]+ "/" + series[0]["files"][0])
+                        subject,
+                        series[0]["path"] + "/" + series[0]["files"][0])
                     self.info["cmd"] += [cmd]
+                else:
+                    raise ValueError(
+                        'Problen with T1'
+                        'Either none present for subject or multiple')
 
     def submit_to_cluster(self, n_jobs=1, fake=False, submit_script=None):
         """ Submit the command built earlier for processing on the cluster.
@@ -507,7 +512,7 @@ class FS_reconstruction():
         if len(self.info['cmd']) < 1:
             raise NameError('cmd to submit is not defined yet')
 
-        for cmd in self.info['cmd']:          
+        for cmd in self.info['cmd']:
             if not fake:
                 self.logger.info('Submitting command:\n{:s}'.format(cmd))
 
@@ -519,7 +524,6 @@ class FS_reconstruction():
                 self.info['cmd'] = []  # clear list for next roun
             else:
                 print(self.info["cmd"])
-                
 
 
 def _check_n_jobs(n_jobs):
