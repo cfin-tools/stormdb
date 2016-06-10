@@ -468,11 +468,19 @@ class FS_reconstruction():
         else:
             self.logger.setLevel(logging.ERROR)
 
-        fs_subjects_dir = os.path.join("/projects", proj_code,
-                                       "scratch/fs_subjects_dir")
-        os.environ["SUBJECTS_DIR"] = fs_subjects_dir
+        self.fs_subjects_dir = os.path.join("/projects", proj_code,
+                                            "scratch/fs_subjects_dir")
+        os.environ["SUBJECTS_DIR"] = self.fs_subjects_dir
 
-    def all_subjects(self):
+    def all_subjects(self, description="t1*"):
+        """Make FreeSurfer reconstruction for all subject in project.
+
+        Params
+        ------
+        description : str
+            String used to select the T1 one from Stormdb. See filter_series 
+            for more information.
+        """
         db = Query(self.info["proj_code"])
 
         included_subjects = db.get_subjects()
@@ -482,7 +490,7 @@ class FS_reconstruction():
             mr_study = db.get_studies(subject, modality='MR', unique=True)
             if len(mr_study) > 0:
                 # This is a 2D list with [series_name, series_number]
-                series = db.filter_series(description="t1*",
+                series = db.filter_series(description=description,
                                           subj_ids=subject,
                                           modalities="MR")
                 if len(series) == 1:  # TODO: make more pythonic
@@ -491,9 +499,46 @@ class FS_reconstruction():
                         series[0]["path"] + "/" + series[0]["files"][0])
                     self.info["cmd"] += [cmd]
                 else:
-                    print ("\nProblen with T1 for subject: %s" % subject,
-                           "Either none or multiple T1\'s "
-                                     "present for subject")
+                    print("\nProblen with T1 for subject: %s" % subject,
+                          "Either none or multiple T1\'s "
+                          "present for subject")
+
+    def single_subject(self, subject=None, description="t1*):
+        """Make FreeSurfer reconstruction for a sinlge subject.
+
+        Params
+        ------
+        subject : str
+            The subject id from the Stormdb.
+        description : str
+            String used to select the T1 one from Stormdb. See filter_series 
+            for more information.
+        """
+        if os.path.exists(self.fs_subjects_dir + subject):
+            raise ValueError("No such project!Subject exist in" +
+                             "fs_subjects_dir! \nPlease delete" +
+                             "or rename subject.")
+
+        db = Query(self.info["proj_code"])
+        # TODO: Add test that subject name is in stormdb
+
+        mr_study = db.get_studies(subject, modality='MR', unique=True)
+
+        if len(mr_study) > 0:
+            # This is a 2D list with [series_name, series_number]
+            series = db.filter_series(description=description,
+                                      subj_ids=subject,
+                                      modalities="MR")
+            if len(series) == 1:  # TODO: make more pythonic
+                cmd = "recon-all -all -subjid %s -i %s" % (
+                    subject, series[0]["path"] + "/" + series[0]["files"][0])
+                self.info["cmd"] += [cmd]
+            else:
+                print("\nProblen with T1 for subject: %s" % subject,
+                      "Either none or multiple T1\'s "
+                      "present for subject")
+        else:
+            print("No MR for subject: %s" % subject)
 
     def submit_to_cluster(self, n_jobs=1, fake=False, submit_script=None):
         """ Submit the command built earlier for processing on the cluster.
