@@ -472,7 +472,15 @@ class FS_reconstruction():
                                             "scratch/fs_subjects_dir")
         os.environ["SUBJECTS_DIR"] = self.fs_subjects_dir
 
-    def all_subjects(self):
+    def all_subjects(self, description="t1*"):
+        """Make FreeSurfer reconstruction for all subject in project.
+
+        Params
+        ------
+        description : str
+            String used to select the T1 one from Stormdb. See filter_series 
+            for more information.
+        """
         db = Query(self.info["proj_code"])
 
         included_subjects = db.get_subjects()
@@ -482,7 +490,7 @@ class FS_reconstruction():
             mr_study = db.get_studies(subject, modality='MR', unique=True)
             if len(mr_study) > 0:
                 # This is a 2D list with [series_name, series_number]
-                series = db.filter_series(description="t1*",
+                series = db.filter_series(description=description,
                                           subj_ids=subject,
                                           modalities="MR")
                 if len(series) == 1:  # TODO: make more pythonic
@@ -495,13 +503,16 @@ class FS_reconstruction():
                           "Either none or multiple T1\'s "
                           "present for subject")
 
-    def single_subject(self, subject=None):
+    def single_subject(self, subject=None, description="t1*):
         """Make FreeSurfer reconstruction for a sinlge subject.
 
         Params
         ------
         subject : str
             The subject id from the Stormdb.
+        description : str
+            String used to select the T1 one from Stormdb. See filter_series 
+            for more information.
         """
         if os.path.exists(self.fs_subjects_dir + subject):
             raise ValueError("No such project!Subject exist in" +
@@ -515,7 +526,7 @@ class FS_reconstruction():
 
         if len(mr_study) > 0:
             # This is a 2D list with [series_name, series_number]
-            series = db.filter_series(description="t1*",
+            series = db.filter_series(description=description,
                                       subj_ids=subject,
                                       modalities="MR")
             if len(series) == 1:  # TODO: make more pythonic
