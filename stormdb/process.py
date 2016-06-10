@@ -379,7 +379,7 @@ class Maxfilter():
         self.info['cmd'] += [cmd]
         self.info['io_mapping'] += [dict(input=in_fname, output=out_fname)]
 
-    def submit_to_cluster(self, n_jobs=1, fake=False, submit_script=None):
+    def submit_to_cluster(self, n_jobs=1, fake=False):
         """ Submit the command built earlier for processing on the cluster.
 
         Things to implement
