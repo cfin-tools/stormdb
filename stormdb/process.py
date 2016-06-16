@@ -1,6 +1,6 @@
 """
 =========================
-Methods to process data in StormDB layout
+Methods to process data in StormDB layout, including submission to cluster.
 
 Credits:
     Several functions are modified versions from those in mne-python
@@ -22,6 +22,88 @@ from mne.io import Raw
 from mne.bem import fit_sphere_to_headshape
 
 from .access import DBError
+
+QSUB_SCHEMA = """
+#!/bin/bash
+
+# Pass on all environment variables
+#$ -V
+# Operate in current working directory
+{cwd_flag:s}
+#$ -N {job_name:s}
+#$ -o {job_name:s}_$JOB_ID.qsub
+# Merge stdout and stderr
+#$ -j y
+#$ -q {queue:s}
+{opt_threaded_flag:s}
+
+# Make sure process uses max requested number of threads!
+export OMP_NUM_THREADS=$NSLOTS
+
+echo "Executing following command on $NSLOTS threads:"
+echo "{exec_cmd:s}"
+
+{exec_cmd:s}
+
+echo "Done executing"
+"""
+
+
+def _format_qsub_schema(exec_cmd, queue, job_name, cwd_flag,
+                        opt_threaded_flag):
+    """All variables should be defined"""
+    if (exec_cmd is None or queue is None or job_name is None or
+            cwd_flag is None or opt_threaded_flag is None):
+        raise ValueError('This should not happen! Contact cjb@cfin.au.dk')
+
+    return QSUB_SCHEMA.format(opt_threaded_flag=opt_threaded_flag,
+                              cwd_flag=cwd_flag, queue=queue,
+                              exec_cmd=exec_cmd, job_name=job_name)
+
+
+def _write_qsub_job(qsub_script, sh_file='submit_job.sh'):
+    """Write temp .sh"""
+    with open(sh_file, 'w') as bash_file:
+        bash_file.writelines(qsub_script)
+
+
+def _delete_qsub_job(sh_file='submit_job.sh'):
+    """Delete temp .sh"""
+    os.unlink(sh_file)
+
+
+def submit_to_cluster(exec_cmd, n_jobs=1, queue='short.q', cwd=True,
+                      job_name=None, cleanup=True):
+
+    opt_threaded_flag = ""
+    cwd_flag = ''
+    if n_jobs > 1:
+        opt_threaded_flag = "#$ -pe threaded {:d}".format(n_jobs)
+        if not queue == 'isis.q':
+            raise ValueError('Make sure you use a parallel queue when '
+                             'submitting jobs with multiple threads.')
+    if job_name is None:
+        job_name = 'py-wrapper'
+    if cwd:
+        cwd_flag = '#$ -cwd'
+
+    qsub_script = _format_qsub_schema(exec_cmd, queue, job_name, cwd_flag,
+                                      opt_threaded_flag)
+
+    _write_qsub_job(qsub_script)
+    try:
+        output = subp.check_output(['qsub', 'submit_job.sh'],
+                                   stderr=subp.STDOUT, shell=False)
+        # subp.check_output(['ls', 'nonexistentfile.sh'], stderr=subp.STDOUT,
+        #                   shell=False)
+    except subp.CalledProcessError as cpe:
+        raise RuntimeError('qsub submission failed with error code '
+                           '{:d}, output is:\n\n{:s}'.format(cpe.returncode,
+                                                             cpe.output))
+    else:
+        print(output.rstrip())
+        if cleanup:
+            _delete_qsub_job()
 
 
 class Maxfilter():
@@ -301,8 +383,8 @@ class Maxfilter():
         self.info['cmd'] += [cmd]
         self.info['io_mapping'] += [dict(input=in_fname, output=out_fname)]
 
-    def submit_to_isis(self, n_jobs=1, fake=False, submit_script=None):
-        """ Submit the command built before for processing on the cluster.
+    def submit_to_cluster(self, n_jobs=1, fake=False):
+        """ Submit the command built earlier for processing on the cluster.
 
         Things to implement
         * check output?
@@ -314,34 +396,17 @@ class Maxfilter():
         fake : bool
             If true, run a fake run, just print the command that will be
             submitted.
-        submit_script : str or None
-            Full path to script handling submission. If None (default),
-            the default script is used:
-            /usr/local/common/meeg-cfin/configurations/bin/submit_to_isis
-
         """
         if len(self.info['cmd']) < 1:
             raise NameError('cmd to submit is not defined yet')
-
-        _check_n_jobs(n_jobs)
-        if submit_script is None:
-            submit_script = \
-                '/usr/local/common/meeg-cfin/configurations/bin/submit_to_isis'
-
-        if os.system(submit_script + ' 2>&1 > /dev/null') >> 8 == 127:
-            raise NameError('submit script ' + submit_script + ' not found')
 
         for ic, cmd in enumerate(self.info['cmd']):
             if not fake:
                 self.logger.info('Submitting command:\n{:s}'.format(cmd))
 
-                submit_cmd = ' '.join((submit_script,
-                                       '{:d}'.format(n_jobs),
-                                       '\"' + cmd + '\"'))  # quotes for safety
-                st = os.system(submit_cmd)
-                if st != 0:
-                    raise RuntimeError('qsub returned non-zero '
-                                       'exit status {:d}'.format(st))
+                submit_to_cluster(cmd, n_jobs=n_jobs, queue='isis.q',
+                                  job_name='maxfilter')
+
                 self.info['cmd'] = []  # clear list for next round
                 self.info['io_mapping'] = []  # clear list for next round
             else:
