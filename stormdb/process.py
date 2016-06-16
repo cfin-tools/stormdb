@@ -48,6 +48,7 @@ echo "{exec_cmd:s}"
 echo "Done executing"
 """
 
+
 def _format_qsub_schema(exec_cmd, queue, job_name, cwd_flag,
                         opt_threaded_flag):
     """All variables should be defined"""
@@ -59,14 +60,17 @@ def _format_qsub_schema(exec_cmd, queue, job_name, cwd_flag,
                               cwd_flag=cwd_flag, queue=queue,
                               exec_cmd=exec_cmd, job_name=job_name)
 
+
 def _write_qsub_job(qsub_script, sh_file='submit_job.sh'):
     """Write temp .sh"""
     with open(sh_file, 'w') as bash_file:
         bash_file.writelines(qsub_script)
 
+
 def _delete_qsub_job(sh_file='submit_job.sh'):
     """Delete temp .sh"""
     os.unlink(sh_file)
+
 
 def submit_to_cluster(exec_cmd, n_jobs=1, queue='short.q', cwd=True,
                       job_name=None, cleanup=True):
@@ -379,7 +383,7 @@ class Maxfilter():
         self.info['cmd'] += [cmd]
         self.info['io_mapping'] += [dict(input=in_fname, output=out_fname)]
 
-    def submit_to_cluster(self, n_jobs=1, fake=False, submit_script=None):
+    def submit_to_cluster(self, n_jobs=1, fake=False):
         """ Submit the command built earlier for processing on the cluster.
 
         Things to implement
