@@ -12,6 +12,7 @@ Methods to interact with the STORM database
 from getpass import getuser, getpass
 import os
 import requests
+from requests import ConnectionError
 import urllib
 
 
@@ -49,15 +50,41 @@ class Query():
 
     def __init__(self, proj_code, stormdblogin='~/.stormdblogin',
                  username=None, verbose=None):
-        if not os.path.exists('/projects/' + proj_code):
-            raise DBError('No such project!')
-
         self.proj_code = proj_code
         self._username = username
         self._stormdblogin = stormdblogin
-        self._server = 'http://hyades00.pet.auh.dk/modules/StormDb/extract/'
-        #  self._wget_cmd = 'wget -qO - test ' + self._server
+
+        default_server = 'http://hyades00.pet.auh.dk/modules/StormDb/extract/'
+        try_alt_server = False
+        try:
+            get = requests.get(default_server)
+        except ConnectionError:
+            try_alt_server = True
+        else:
+            if not get.status_code == 200:
+                try_alt_server = True
+            else:
+                self._server = default_server
+
+        raise_dberror = False
+        if try_alt_server:
+            alt_server = 'http://localhost:10080/modules/StormDb/extract/'
+            try:
+                get = requests.get(alt_server)
+            except ConnectionError:
+                raise_dberror = True
+            else:
+                if not get.status_code == 200:
+                    raise_dberror = True
+                else:
+                    self._server = alt_server
+
+        if raise_dberror:
+            raise DBError('No access to database server (tried: '
+                          '{0} and\n{1})'.format(default_server, alt_server))
+
         self._get_login_code(username=username, verbose=verbose)
+        self._check_proj_code()
 
     def _get_login_code(self, username=None, verbose=False):
         try:
@@ -99,12 +126,18 @@ class Query():
                       'and re-run your query.'
                 os.chmod(os.path.expanduser(self._stormdblogin), 0o600)
                 os.remove(os.path.expanduser(self._stormdblogin))
-                response = msg
                 self._get_login_code()
+            elif response.find('The project does not exist') != -1:
+                msg = 'The project ID/code you used does not exist ' + \
+                      'in the database, please check.'
 
-            raise DBError(response)
+            raise DBError(msg)
 
         return(0)
+
+    def _check_proj_code(self, verbose=False):
+        url = '?' + self._login_code + '&projectCode=' + self.proj_code
+        _ = self._send_request(url)
 
     def _send_request(self, url, verbose=False):
         full_url = self._server + url
