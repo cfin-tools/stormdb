@@ -88,7 +88,7 @@ class ClusterJob(object):
         self.jobid = None
         self.running = False
         self.completed = False
-        self._status_msg = 'Not initialised'
+        self._status_msg = 'Job not submitted yet'
 
     def _create_qsub_script(self, job_name, cwd_flag, opt_threaded_flag):
         """All variables should be defined"""
@@ -173,10 +173,11 @@ class ClusterJob(object):
                                    stderr=subp.STDOUT, shell=True)
 
         output = output.rstrip()
-        if self.completed or (self.running and len(output) == 0):
-            self._status_msg = 'Job completed'
-            self.completed = True
-            self.running = False
+        if len(output) == 0:
+            if self.running and not self.completed:
+                self._status_msg = 'Job completed'
+                self.completed = True
+                self.running = False
         else:
             runcode, hostname = output.split(' ')
             queuename, exechost = hostname.split('@')
