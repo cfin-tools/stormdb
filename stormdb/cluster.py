@@ -75,7 +75,7 @@ class ClusterJob(object):
 
         if not proj_name:
             raise(ValueError('Jobs associated with specific project'))
-        Query()._check_proj_code(proj_name)  # let fail if bad proj_name
+        Query(proj_name)._check_proj_code()  # let fail if bad proj_name
         self.proj_name = proj_name
 
         if queue not in self.cluster.nodes:
