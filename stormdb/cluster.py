@@ -14,6 +14,7 @@ import os
 # import numpy as np
 import subprocess as subp
 import re
+from six import string_types
 from .access import Query
 
 
@@ -113,8 +114,8 @@ class ClusterJob(object):
     def submit(self, n_jobs=1, cwd=True,
                job_name=None, cleanup=True, resubmit=False):
 
-        if not self.cmd:
-            raise RuntimeError('No command specified!')
+        if not isinstance(self.cmd, string_types):
+            raise RuntimeError('Command should be a single string.')
         if self.running:
             raise RuntimeError('Job already running!')
         if self.completed and not resubmit:
@@ -158,7 +159,7 @@ class ClusterJob(object):
                                    stderr=subp.STDOUT, shell=True)
 
         output = output.rstrip()
-        if self.running and len(output) == 0:
+        if self.completed or (self.running and len(output) == 0):
             print('Job completed')
             self.completed = True
             self.running = False
