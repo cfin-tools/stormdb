@@ -69,6 +69,7 @@ class ClusterJob(object):
         self.cmd = None
         self.jobid = None
         self.running = False
+        self.completed = False
 
     def _format_qsub_schema(self, exec_cmd, queue, job_name, cwd_flag,
                             opt_threaded_flag):
@@ -122,18 +123,33 @@ class ClusterJob(object):
             # print(output.rstrip())
             m = re.search('(\d+)', output.rstrip())
             self.jobid = m.group(1)
-            self.running = True
             if cleanup:
                 self._delete_qsub_job()
+            print('Cluster job submitted, job ID: {0}'.format(self.jobid))
 
     # override from base class to refer only to this job
     def status(self):
-        output = subp.check_output(['qstat -u ', os.environ['USER'],
-                                    ' | grep {:d}'.format(self.jobid),
+        output = subp.check_output(['qstat -u ' + os.environ['USER'] +
+                                    ' | grep {0}'.format(self.jobid) +
                                     ' | awk \'{print $5, $8}\''],
-                                   stderr=subp.STDOUT, shell=False)
+                                   stderr=subp.STDOUT, shell=True)
 
-        return(output)
+        output = output.rstrip()
+        if len(output) == 0:
+            print('Job completed')
+            self.completed = True
+            return
+
+        runcode, hostname = output.split(' ')
+        queuename, exechost = hostname.split('@')
+        exechost = exechost.split('.')[0]
+
+        if runcode == 'r':
+            self.running = True
+            print('Running on {0} ({1})'.format(exechost, queuename))
+        elif runcode == 'qw':
+            self.running = False
+            print('Waiting in queue ({0})'.format(queuename))
 
     def kill(self):
         print('qdel {:s})'.format(self.jobid))
