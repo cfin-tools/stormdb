@@ -214,7 +214,7 @@ class ClusterBatch(object):
         return cmdlist
 
     def add_job(self, cmd, queue='short.q'):
-        self._joblist += [ClusterJob(self.proj_name, queue=queue, cmd=cmd)]
+        self._joblist += [ClusterJob(cmd, self.proj_name, queue=queue)]
 
     def submit(self, **kwargs):
         for job in self._joblist:
