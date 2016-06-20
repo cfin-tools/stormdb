@@ -88,6 +88,7 @@ class ClusterJob(object):
         self.jobid = None
         self.running = False
         self.completed = False
+        self._status_msg = 'Not initialised'
 
     def _create_qsub_script(self, job_name, cwd_flag, opt_threaded_flag):
         """All variables should be defined"""
@@ -115,11 +116,15 @@ class ClusterJob(object):
 
         if not isinstance(self.cmd, string_types):
             raise RuntimeError('Command should be a single string.')
+
+        self.check_status()
         if self.running:
-            raise RuntimeError('Job already running!')
+            print('Job {0} is already running!'.format(self.jobid))
+            return
         if self.completed and not resubmit:
-            raise RuntimeError('Job is already completed, set '
-                               'resubmit=True to re-run.')
+            print('Job {0} is already completed, set resubmit=True to '
+                  're-run.'.format(self.jobid))
+            return
 
         opt_threaded_flag = ""
         cwd_flag = ''
@@ -156,7 +161,12 @@ class ClusterJob(object):
                 self._delete_qsub_job()
             print('Cluster job submitted, job ID: {0}'.format(self.jobid))
 
-    def print_status(self):
+    @property
+    def status(self):
+        self.check_status()
+        return(self._status_msg)
+
+    def check_status(self):
         output = subp.check_output(['qstat -u ' + os.environ['USER'] +
                                     ' | grep {0}'.format(self.jobid) +
                                     ' | awk \'{print $5, $8}\''],
@@ -164,7 +174,7 @@ class ClusterJob(object):
 
         output = output.rstrip()
         if self.completed or (self.running and len(output) == 0):
-            print('Job completed')
+            self._status_msg = 'Job completed'
             self.completed = True
             self.running = False
         else:
@@ -174,10 +184,11 @@ class ClusterJob(object):
 
             if runcode == 'r':
                 self.running = True
-                print('Running on {0} ({1})'.format(exechost, queuename))
+                self._status_msg = 'Running on {0} ({1})'.format(exechost,
+                                                                 queuename)
             elif runcode == 'qw':
                 self.running = False
-                print('Waiting in queue ({0})'.format(queuename))
+                self._status_msg = 'Waiting in queue ({0})'.format(queuename)
 
     def kill(self):
         subp.check_output(['qdel {0}'.format(self.jobid)],
@@ -215,6 +226,14 @@ class ClusterBatch(object):
 
     def add_job(self, cmd, queue='short.q'):
         self._joblist += [ClusterJob(cmd, self.proj_name, queue=queue)]
+
+    @property
+    def status(self):
+        statlist = []
+        for job in self._joblist:
+            job.check_status()
+            statlist += [job.status]
+        return(statlist)
 
     def submit(self, **kwargs):
         for job in self._joblist:
