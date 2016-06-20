@@ -8,8 +8,8 @@ Methods to process data in StormDB layout on Hyades cluster
 #
 # License: BSD (3-clause)
 import os
-# import sys
-# import logging
+import sys
+import logging
 # import warnings
 # import numpy as np
 import subprocess as subp
@@ -71,12 +71,11 @@ class Cluster(object):
 class ClusterJob(object):
     ''''''
     def __init__(self, proj_name=None, queue='short.q', cmd=None):
-        # super(ClusterJob, self).__init__()
         self.cluster = Cluster()
 
         if not proj_name:
-            raise(ValueError('Jobs associated with specific project'))
-        Query(proj_name)._check_proj_code()  # let fail if bad proj_name
+            raise(ValueError('Jobs are associated with a specific project.'))
+        Query(proj_name)._check_proj_name()  # let fail if bad proj_name
         self.proj_name = proj_name
 
         if queue not in self.cluster.nodes:
@@ -111,8 +110,8 @@ class ClusterJob(object):
         """Delete temp .sh"""
         os.unlink(sh_file)
 
-    def submit(self, n_jobs=1, cwd=True,
-               job_name=None, cleanup=True, resubmit=False):
+    def submit(self, n_threads=1, cwd=True, job_name=None, cleanup=True,
+               resubmit=False, fake=False):
 
         if not isinstance(self.cmd, string_types):
             raise RuntimeError('Command should be a single string.')
@@ -124,8 +123,8 @@ class ClusterJob(object):
 
         opt_threaded_flag = ""
         cwd_flag = ''
-        if n_jobs > 1:
-            opt_threaded_flag = "#$ -pe threaded {:d}".format(n_jobs)
+        if n_threads > 1:
+            opt_threaded_flag = "#$ -pe threaded {:d}".format(n_threads)
             if not self.queue == 'isis.q':
                 raise ValueError('Make sure you use a parallel queue when '
                                  'submitting jobs with multiple threads.')
@@ -136,6 +135,11 @@ class ClusterJob(object):
 
         self._create_qsub_script(job_name, cwd_flag,
                                  opt_threaded_flag)
+        if fake:
+            print('Following script would be submitted (if not fake)')
+            print(self.qsub_script)
+            return
+
         self._write_qsub_job()
         try:
             output = subp.check_output(['qsub', 'submit_job.sh'],
@@ -183,6 +187,42 @@ class ClusterJob(object):
         self.running = False
 
 
+class ClusterBatch(object):
+    """Many ClusterJob's together
+    """
+    def __init__(self, proj_name, verbose=False):
+        self.cluster = Cluster()
+        Query(proj_name)._check_proj_name()  # let fail if bad proj_name
+        self.proj_name = proj_name
+        self._joblist = []
+
+        self.logger = logging.getLogger('__name__')
+        self.logger.propagate = False
+        stdout_stream = logging.StreamHandler(sys.stdout)
+        self.logger.addHandler(stdout_stream)
+        if verbose:
+            self.logger.setLevel(logging.INFO)
+        else:
+            self.logger.setLevel(logging.ERROR)
+
+    def build_cmd(self):
+        raise RuntimeError('This should be overriden in subclasses!')
+
+    @property
+    def commands(self):
+        cmdlist = [job.cmd for job in self._joblist]
+        return cmdlist
+
+    def add_job(self, cmd, queue='short.q'):
+        self._joblist += [ClusterJob(self.proj_name, queue=queue, cmd=cmd)]
+
+    def submit(self, **kwargs):
+        for job in self.joblist:
+            # submit_args = {key: val for key, val in kwargs.iteritems()}
+            if type(job) is ClusterJob:
+                job.submit(**kwargs)
+            else:
+                raise ValueError('This should never happen, report an Issue!')
 # class Maxfilter(ClusterJob):
 #     def __init__(self, proj_name):
 #         super(Maxfilter, self).__init__(proj_name)

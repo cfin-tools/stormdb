@@ -33,7 +33,7 @@ class Query():
 
     Parameters
     ----------
-    proj_code : str
+    proj_name : str
         The name of the project.
     stormdblogin : str
         The filename to store database login credentials as a hash.
@@ -45,14 +45,13 @@ class Query():
 
     Attributes
     ----------
-    proj_code : str
+    proj_name : str
         Name of project
     """
 
-    def __init__(self, proj_code, stormdblogin='~/.stormdblogin',
-                 username=None, verbose=None):
-        self.proj_code = proj_code
-        self._username = username
+    def __init__(self, proj_name, stormdblogin='~/.stormdblogin',
+                 verbose=None):
+        self.proj_name = proj_name
         self._stormdblogin = stormdblogin
 
         default_server = 'http://hyades00.pet.auh.dk/modules/StormDb/extract/'
@@ -84,10 +83,10 @@ class Query():
             raise DBError('No access to database server (tried: '
                           '{0} and\n{1})'.format(default_server, alt_server))
 
-        self._get_login_code(username=username, verbose=verbose)
-        self._check_proj_code()
+        self._get_login_code(verbose=verbose)
+        self._check_proj_name()
 
-    def _get_login_code(self, username=None, verbose=False):
+    def _get_login_code(self, verbose=False):
         try:
             with open(os.path.expanduser(self._stormdblogin), 'r') as fid:
                 if verbose:
@@ -98,10 +97,8 @@ class Query():
             print('Login credentials not found, please enter them here')
             print('WARNING: This might not work if you\'re in an IDE '
                   '(e.g. spyder)!')
-            if username:
-                usr = username
-            else:
-                usr = getuser()
+
+            usr = getuser()
 
             prompt = 'User \"{:s}\", please enter your password: '.format(usr)
             pwd = getpass(prompt)
@@ -136,8 +133,8 @@ class Query():
 
         return(0)
 
-    def _check_proj_code(self, verbose=False):
-        url = '?' + self._login_code + '&projectCode=' + self.proj_code
+    def _check_proj_name(self, verbose=False):
+        url = '?' + self._login_code + '&projectCode=' + self.proj_name
         self._send_request(url)
 
     def _send_request(self, url, verbose=False):
@@ -183,7 +180,7 @@ class Query():
                             'excluded'""")
 
         url = scode + '?' + self._login_code + \
-            '&projectCode=' + self.proj_code
+            '&projectCode=' + self.proj_name
         output = self._send_request(url)
 
         # Split at '\n'
@@ -218,7 +215,7 @@ class Query():
         """
 
         url = 'studies?' + self._login_code + \
-            '&projectCode=' + self.proj_code + '&subjectNo=' + subj_id
+            '&projectCode=' + self.proj_name + '&subjectNo=' + subj_id
         output = self._send_request(url)
 
         # Split at '\n'
@@ -229,7 +226,7 @@ class Query():
         if modality:
             for ii, study in enumerate(stud_list):
                 url = 'modalities?' + self._login_code + \
-                    '&projectCode=' + self.proj_code + '&subjectNo=' + \
+                    '&projectCode=' + self.proj_name + '&subjectNo=' + \
                       subj_id + '&study=' + study
                 output = self._send_request(url).split('\n')
 
@@ -274,7 +271,7 @@ class Query():
         The choice of a dict as output can be reconsidered.
         """
         url = 'series?' + self._login_code + '&projectCode=' + \
-            self.proj_code + '&subjectNo=' + \
+            self.proj_name + '&subjectNo=' + \
             subj_id + '&study=' + study + '&modality=' + modality
         output = self._send_request(url)
 
@@ -318,7 +315,7 @@ class Query():
             series = str(series)
 
         url = 'files?' + self._login_code + '&projectCode=' + \
-              self.proj_code + '&subjectNo=' + subj_id + '&study=' + \
+              self.proj_name + '&subjectNo=' + subj_id + '&study=' + \
               study + '&modality=' + modality + '&serieNo=' + series
         output = self._send_request(url)
 
@@ -395,7 +392,7 @@ class Query():
             outp += 'outputoptions[inclfiles]=1&'
 
         url = 'filteredseries?' + self._login_code + '&projectCode=' + \
-              self.proj_code + '&subjects=' + subj_ids + '&studies=' + \
+              self.proj_name + '&subjects=' + subj_ids + '&studies=' + \
               studies + '&modalities=' + modalities + \
               '&types=' + types + '&anyWithType=' + anywithtype + \
               '&description=' + description + '&excluded=' + excluded +\
@@ -429,5 +426,5 @@ if __name__ == '__main__':
 
     project_code = 'MEG_service'
 
-    Q = Query(proj_code=project_code)
+    Q = Query(proj_name=project_code)
     print(Q)

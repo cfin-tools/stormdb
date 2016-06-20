@@ -11,19 +11,15 @@ Credits:
 # Author: Chris Bailey <cjb@cfin.au.dk>
 #
 # License: BSD (3-clause)
-import os
-import sys
-import logging
+# import logging
 import warnings
 import inspect
 import numpy as np
-import subprocess as subp
 
 from mne.io import Raw
 from mne.bem import fit_sphere_to_headshape
 
-from .access import DBError
-from .cluster import ClusterJob
+from .cluster import ClusterBatch
 
 
 class MNE_raw_filter():
@@ -41,12 +37,12 @@ class MNE_raw_filter():
         return(args, kwargs)
 
 
-class Maxfilter():
+class Maxfilter(ClusterBatch):
     """ Object for maxfiltering data from database into StormDB filesystem
 
     Parameters
     ----------
-    proj_code : str
+    proj_name : str
         The name of the project.
     bad : list
         List of a priori bad channels (default: empty list)
@@ -55,93 +51,82 @@ class Maxfilter():
 
     Attributes
     ----------
-    proj_code : str
-        Name of project
-    cmd : list of str
+    info : dict
+        Various info
+    joblist : list of ClusterJob's
         If defined, represents a sequence of maxfilter shell calls.
     """
 
-    def __init__(self, proj_code, bad=[], verbose=True):
-        if not os.path.exists('/projects/' + proj_code):
-            raise DBError('No such project!')
+    def __init__(self, proj_name, bad=[], verbose=True):
+        super(Maxfilter, self).__init__(proj_name)
 
-        self.info = dict(proj_code=proj_code, bad=bad, cmd=[],
-                         io_mapping=[])
+        self.info = dict(proj_name=proj_name, bad=bad, io_mapping=[])
         # Consider placing other vars here
 
-        self.logger = logging.getLogger('__name__')
-        self.logger.propagate = False
-        stdout_stream = logging.StreamHandler(sys.stdout)
-        self.logger.addHandler(stdout_stream)
-        if verbose:
-            self.logger.setLevel(logging.INFO)
-        else:
-            self.logger.setLevel(logging.ERROR)
+    # def detect_bad_chans_xscan(self, in_fname, use_tsss=False, n_jobs=1,
+    #                            xscan_bin=None, set_bad=True):
+    #     """Experimental method from Elekta for detecting bad channels
+    #
+    #     WARNING! Use at own risk, not documented/fully tested!
+    #
+    #     Parameters
+    #     ----------
+    #     in_fname : str
+    #         Input file name
+    #     use_tsss : bool
+    #         If True, uses tSSS-based bad channel estimation (slow!). Default
+    #         is False: use tSSS for particularly bad artefacts like dentals.
+    #     xscan_bin : str
+    #         Full path to xscan-binary (if None, default in /neuro/bin is used)
+    #     set_bad : bool
+    #         Set the channels found by xscan as bad in the Maxfilter object
+    #         (default: True). NB: bad-list is amended, not replaced!
+    #     """
+    #     _check_n_jobs(n_jobs)
+    #
+    #     if xscan_bin is None:
+    #         xscan_bin = '/neuro/bin/util/xscan'
+    #
+    #     # Start building command
+    #     cmd = [xscan_bin, '-v', '-f', '{:s}'.format(in_fname)]
+    #
+    #     proc = subp.Popen(cmd, shell=True, stdout=subp.PIPE)
+    #     stdout = proc.communicate()[0]  # read stdout
+    #     retcode = proc.wait()
+    #
+    #     if retcode != 0:
+    #         if retcode == 127:
+    #             raise NameError('xscan binary ' + xscan_bin + ' not found')
+    #         else:
+    #             errmsg = 'xscan exited with an error, output is:\n\n' + stdout
+    #             raise RuntimeError(errmsg)
+    #
+    #     # CHECKME!
+    #     bads_str = []
+    #     for il in range(2):
+    #         row = stdout[-1*il]
+    #         idx = row.find('Static')
+    #         if idx > 0 and ('flat' in row or 'bad' in row):
+    #             idx = row.find('): ')
+    #             bads_str += [row[idx + 3]]
+    #
+    #     self.logger.info('xscan detected the following bad channels:\n' +
+    #                      bads_str)
+    #     if set_bad:
+    #         new_bads = bads_str.split()
+    #         uniq_bads = [b for b in new_bads if b not in self.bad]
+    #         self.info['bad'] = uniq_bads
+    #         self.logger.info('Maxfilter object bad channel list updated')
 
-    def detect_bad_chans_xscan(self, in_fname, use_tsss=False, n_jobs=1,
-                               xscan_bin=None, set_bad=True):
-        """Experimental method from Elekta for detecting bad channels
-
-        WARNING! Use at own risk, not documented/fully tested!
-
-        Parameters
-        ----------
-        in_fname : str
-            Input file name
-        use_tsss : bool
-            If True, uses tSSS-based bad channel estimation (slow!). Default
-            is False: use tSSS for particularly bad artefacts like dentals.
-        xscan_bin : str
-            Full path to xscan-binary (if None, default in /neuro/bin is used)
-        set_bad : bool
-            Set the channels found by xscan as bad in the Maxfilter object
-            (default: True). NB: bad-list is amended, not replaced!
-        """
-        _check_n_jobs(n_jobs)
-
-        if xscan_bin is None:
-            xscan_bin = '/neuro/bin/util/xscan'
-
-        # Start building command
-        cmd = [xscan_bin, '-v', '-f', '{:s}'.format(in_fname)]
-
-        proc = subp.Popen(cmd, shell=True, stdout=subp.PIPE)
-        stdout = proc.communicate()[0]  # read stdout
-        retcode = proc.wait()
-
-        if retcode != 0:
-            if retcode == 127:
-                raise NameError('xscan binary ' + xscan_bin + ' not found')
-            else:
-                errmsg = 'xscan exited with an error, output is:\n\n' + stdout
-                raise RuntimeError(errmsg)
-
-        # CHECKME!
-        bads_str = []
-        for il in range(2):
-            row = stdout[-1*il]
-            idx = row.find('Static')
-            if idx > 0 and ('flat' in row or 'bad' in row):
-                idx = row.find('): ')
-                bads_str += [row[idx + 3]]
-
-        self.logger.info('xscan detected the following bad channels:\n' +
-                         bads_str)
-        if set_bad:
-            new_bads = bads_str.split()
-            uniq_bads = [b for b in new_bads if b not in self.bad]
-            self.info['bad'] = uniq_bads
-            self.logger.info('Maxfilter object bad channel list updated')
-
-    def build_maxfilter_cmd(self, in_fname, out_fname, origin='0 0 40',
-                            frame='head', bad=None, autobad='off', skip=None,
-                            force=False, st=False, st_buflen=16.0,
-                            st_corr=0.96, trans=None, movecomp=False,
-                            headpos=False, hp=None, hpistep=None,
-                            hpisubt=None, hpicons=True, linefreq=None,
-                            cal=None, ctc=None, mx_args='',
-                            maxfilter_bin='/neuro/bin/util/maxfilter',
-                            logfile=None):
+    def build_cmd(self, in_fname, out_fname, origin='0 0 40',
+                  frame='head', bad=None, autobad='off', skip=None,
+                  force=False, st=False, st_buflen=16.0,
+                  st_corr=0.96, trans=None, movecomp=False,
+                  headpos=False, hp=None, hpistep=None,
+                  hpisubt=None, hpicons=True, linefreq=None,
+                  cal=None, ctc=None, mx_args='',
+                  maxfilter_bin='/neuro/bin/util/maxfilter',
+                  logfile=None):
 
         """Build a NeuroMag MaxFilter command for later execution.
 
@@ -315,44 +300,44 @@ class Maxfilter():
         if logfile:
             cmd += ' | tee ' + logfile
 
-        self.info['cmd'] += [cmd]
+        self.add_job(cmd, queue='isis.q')
         self.info['io_mapping'] += [dict(input=in_fname, output=out_fname)]
 
-    def submit_to_cluster(self, n_jobs=1, fake=False):
-        """ Submit the command built earlier for processing on the cluster.
-
-        Things to implement
-        * check output?
-
-        Parameters
-        ----------
-        n_jobs : int
-            Number of parallel threads to allow (Intel MKL). Max 12!
-        fake : bool
-            If true, run a fake run, just print the command that will be
-            submitted.
-        """
-        if len(self.info['cmd']) < 1:
-            raise NameError('cmd to submit is not defined yet')
-
-        for ic, cmd in enumerate(self.info['cmd']):
-            if not fake:
-                self.logger.info('Submitting command:\n{:s}'.format(cmd))
-
-                submit_to_cluster(cmd, n_jobs=n_jobs, queue='isis.q',
-                                  job_name='maxfilter')
-
-                self.info['cmd'] = []  # clear list for next round
-                self.info['io_mapping'] = []  # clear list for next round
-            else:
-                print('{:d}: {:s}'.format(ic + 1,
-                                          self.info['io_mapping'][ic]['input']))
-                print('\t-->{:s}'.format(self.info['io_mapping'][ic]['output']))
-
-
-def _check_n_jobs(n_jobs):
-    """Check that n_jobs is sane"""
-    if n_jobs > 12:
-        raise ValueError('isis only has 12 cores!')
-    elif n_jobs < 1 or type(n_jobs) is not int:
-        raise ValueError('number of jobs must be a positive integer!')
+#     def submit_to_cluster(self, n_jobs=1, fake=False):
+#         """ Submit the command built earlier for processing on the cluster.
+#
+#         Things to implement
+#         * check output?
+#
+#         Parameters
+#         ----------
+#         n_jobs : int
+#             Number of parallel threads to allow (Intel MKL). Max 12!
+#         fake : bool
+#             If true, run a fake run, just print the command that will be
+#             submitted.
+#         """
+#         if len(self.info['cmd']) < 1:
+#             raise NameError('cmd to submit is not defined yet')
+#
+#         for ic, cmd in enumerate(self.info['cmd']):
+#             if not fake:
+#                 self.logger.info('Submitting command:\n{:s}'.format(cmd))
+#
+#                 submit_to_cluster(cmd, n_jobs=n_jobs, queue='isis.q',
+#                                   job_name='maxfilter')
+#
+#                 self.info['cmd'] = []  # clear list for next round
+#                 self.info['io_mapping'] = []  # clear list for next round
+#             else:
+#                 print('{:d}: {:s}'.format(ic + 1,
+#                                           self.info['io_mapping'][ic]['input']))
+#                 print('\t-->{:s}'.format(self.info['io_mapping'][ic]['output']))
+#
+#
+# def _check_n_jobs(n_jobs):
+#     """Check that n_jobs is sane"""
+#     if n_jobs > 12:
+#         raise ValueError('isis only has 12 cores!')
+#     elif n_jobs < 1 or type(n_jobs) is not int:
+#         raise ValueError('number of jobs must be a positive integer!')
