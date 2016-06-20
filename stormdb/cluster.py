@@ -14,7 +14,7 @@ import os
 # import numpy as np
 import subprocess as subp
 import re
-# from .access import DBError
+from .access import Query
 
 
 QSUB_SCHEMA = """
@@ -75,7 +75,9 @@ class ClusterJob(object):
 
         if not proj_name:
             raise(ValueError('Jobs associated with specific project'))
+        Query()._check_proj_code(proj_name)  # let fail if bad proj_name
         self.proj_name = proj_name
+
         if queue not in self.cluster.nodes:
             raise ValueError('Unknown queue ({0})!'.format(queue))
         self.queue = queue
