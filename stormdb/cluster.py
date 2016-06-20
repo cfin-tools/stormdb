@@ -176,8 +176,8 @@ class ClusterJob(object):
         if len(output) == 0:
             if self.running and not self.completed:
                 self._status_msg = 'Job completed'
-                self.completed = True
                 self.running = False
+                self.completed = True
         else:
             runcode, hostname = output.split(' ')
             queuename, exechost = hostname.split('@')
@@ -185,10 +185,12 @@ class ClusterJob(object):
 
             if runcode == 'r':
                 self.running = True
+                self.completed = False
                 self._status_msg = 'Running on {0} ({1})'.format(exechost,
                                                                  queuename)
             elif runcode == 'qw':
                 self.running = False
+                self.completed = False
                 self._status_msg = 'Waiting in queue ({0})'.format(queuename)
 
     def kill(self):
@@ -197,6 +199,8 @@ class ClusterJob(object):
         print('Job {:s} killed.'.format(self.jobid))
         self.jobid = None
         self.running = False
+        self.completed = False
+        self._status_msg = 'Job was previously killed.'
 
 
 class ClusterBatch(object):
