@@ -15,6 +15,7 @@ import os
 import sys
 import logging
 import warnings
+import inspect
 import numpy as np
 import subprocess as subp
 
@@ -23,6 +24,21 @@ from mne.bem import fit_sphere_to_headshape
 
 from .access import DBError
 from .cluster import ClusterJob
+
+
+class MNE_raw_filter():
+    """ Foo
+    """
+    def __init__(self):
+        pass
+
+    def parse_arguments():
+        argspec = inspect.getargspec(Raw.filter)
+        n_pos = len(argspec.args - argspec.defaults)
+        args = argspec.args[:n_pos]
+        kwargs = {key: val for key, val in zip(argspec.args[n_pos:],
+                                               argspec.defaults)}
+        return(args, kwargs)
 
 
 class Maxfilter():
