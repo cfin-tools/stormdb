@@ -224,6 +224,10 @@ class ClusterBatch(object):
         else:
             self.logger.setLevel(logging.ERROR)
 
+    def __del__(self):
+        for job in self._joblist:
+            job.kill()
+
     def build_cmd(self):
         raise RuntimeError('This should be overriden in subclasses!')
 
