@@ -133,10 +133,9 @@ class ClusterJob(object):
         if cwd:
             cwd_flag = '#$ -cwd'
 
-        qsub_script = self._create_qsub_script(job_name, cwd_flag,
-                                               opt_threaded_flag)
-
-        self._write_qsub_job(qsub_script)
+        self._create_qsub_script(job_name, cwd_flag,
+                                 opt_threaded_flag)
+        self._write_qsub_job()
         try:
             output = subp.check_output(['qsub', 'submit_job.sh'],
                                        stderr=subp.STDOUT, shell=False)
