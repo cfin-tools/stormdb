@@ -44,27 +44,42 @@ echo "Done executing"
 
 
 class Cluster(object):
-    def __init__(self, proj_name=None):
-        pass
+    def __init__(self, name='hyades'):
+        self.name = name
 
-    def status(self):
-        output = subp.check_output(['qstat -u ', os.environ['USER']],
-                                   stderr=subp.STDOUT, shell=False)
+    @property
+    def nodes(self):
+        queue_list = self.get_load()
+        return([q['name'] for q in queue_list])
 
-        print(output)
+    def get_load(self):
+        '''Return list of queue load dictionaries'''
 
-    def kill(self, jobno):
-        print('qdel {:s})'.format(jobno))
+        output = subp.check_output(['qstat -g c'],
+                                   stderr=subp.STDOUT, shell=True)
+
+        queues = output.split('\n')[2:-1]  # throw away header lines and \n
+        q_list = []
+        for q in queues:
+            qq = q.split()
+            q_list += [dict(name=qq[0], load=qq[1], used=qq[2], avail=qq[4],
+                            total=qq[5])]
+        return(q_list)
 
 
 class ClusterJob(object):
     ''''''
-    def __init__(self, proj_name=None):
+    def __init__(self, proj_name=None, queue='short.q'):
+        # super(ClusterJob, self).__init__()
+        self.cluster = Cluster()
+
         if not proj_name:
             raise(ValueError('Jobs associated with specific project'))
         self.proj_name = proj_name
+        if queue not in self.cluster.nodes:
+            raise ValueError('Unknown queue ({0})!'.format(queue))
+        self.queue = queue
 
-        super(ClusterJob, self).__init__()
         self._qsub_schema = QSUB_SCHEMA
         self.cmd = None
         self.jobid = None
