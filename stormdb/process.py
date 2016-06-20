@@ -57,10 +57,10 @@ class Maxfilter(ClusterBatch):
         If defined, represents a sequence of maxfilter shell calls.
     """
 
-    def __init__(self, proj_name, bad=[], verbose=True):
+    def __init__(self, proj_name, bads=[], verbose=True):
         super(Maxfilter, self).__init__(proj_name)
 
-        self.info = dict(proj_name=proj_name, bad=bad, io_mapping=[])
+        self.info = dict(bads=bads, io_mapping=[])
         # Consider placing other vars here
 
     # def detect_bad_chans_xscan(self, in_fname, use_tsss=False, n_jobs=1,

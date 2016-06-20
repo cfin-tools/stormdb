@@ -70,7 +70,7 @@ class Cluster(object):
 
 class ClusterJob(object):
     ''''''
-    def __init__(self, proj_name=None, queue='short.q', cmd=None):
+    def __init__(self, cmd=None, proj_name=None, queue='short.q'):
         self.cluster = Cluster()
 
         if not proj_name:
@@ -217,8 +217,7 @@ class ClusterBatch(object):
         self._joblist += [ClusterJob(self.proj_name, queue=queue, cmd=cmd)]
 
     def submit(self, **kwargs):
-        for job in self.joblist:
-            # submit_args = {key: val for key, val in kwargs.iteritems()}
+        for job in self._joblist:
             if type(job) is ClusterJob:
                 job.submit(**kwargs)
             else:
