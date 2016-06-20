@@ -118,6 +118,9 @@ class ClusterJob(object):
             raise RuntimeError('Command should be a single string.')
 
         self.check_status()
+        if self.jobid:
+            print('Job {0} was already submitted!'.format(self.jobid))
+            return
         if self.running:
             print('Job {0} is already running!'.format(self.jobid))
             return
