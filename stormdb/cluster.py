@@ -194,7 +194,7 @@ class ClusterJob(object):
             elif runcode == 'qw':
                 self.running = False
                 self.completed = False
-                self._status_msg = 'Waiting in queue ({0})'.format(queuename)
+                self._status_msg = 'Waiting in the queue'
 
     def kill(self):
         subp.check_output(['qdel {0}'.format(self.jobid)],
