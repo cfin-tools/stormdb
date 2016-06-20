@@ -69,7 +69,7 @@ class Cluster(object):
 
 class ClusterJob(object):
     ''''''
-    def __init__(self, proj_name=None, queue='short.q'):
+    def __init__(self, proj_name=None, queue='short.q', cmd=None):
         # super(ClusterJob, self).__init__()
         self.cluster = Cluster()
 
@@ -83,41 +83,49 @@ class ClusterJob(object):
         self.queue = queue
 
         self._qsub_schema = QSUB_SCHEMA
-        self.cmd = None
+        self.qsub_script = None
+        self.cmd = cmd
         self.jobid = None
         self.running = False
         self.completed = False
 
-    def _format_qsub_schema(self, exec_cmd, queue, job_name, cwd_flag,
-                            opt_threaded_flag):
+    def _create_qsub_script(self, job_name, cwd_flag, opt_threaded_flag):
         """All variables should be defined"""
-        if (exec_cmd is None or queue is None or job_name is None or
+        if (self.cmd is None or self.queue is None or job_name is None or
                 cwd_flag is None or opt_threaded_flag is None):
             raise ValueError('This should not happen, please report an Issue!')
 
-        return self._qsub_schema.format(opt_threaded_flag=opt_threaded_flag,
-                                        cwd_flag=cwd_flag, queue=queue,
-                                        exec_cmd=exec_cmd, job_name=job_name)
+        self.qsub_script =\
+            self._qsub_schema.format(opt_threaded_flag=opt_threaded_flag,
+                                     cwd_flag=cwd_flag, queue=self.queue,
+                                     exec_cmd=self.cmd, job_name=job_name)
 
-    @staticmethod
-    def _write_qsub_job(qsub_script, sh_file='submit_job.sh'):
+    def _write_qsub_job(self, sh_file='submit_job.sh'):
         """Write temp .sh"""
         with open(sh_file, 'w') as bash_file:
-            bash_file.writelines(qsub_script)
+            bash_file.writelines(self.qsub_script)
 
     @staticmethod
     def _delete_qsub_job(sh_file='submit_job.sh'):
         """Delete temp .sh"""
         os.unlink(sh_file)
 
-    def submit(self, exec_cmd, n_jobs=1, queue='short.q', cwd=True,
-               job_name=None, cleanup=True):
+    def submit(self, n_jobs=1, cwd=True,
+               job_name=None, cleanup=True, resubmit=False):
+
+        if not self.cmd:
+            raise RuntimeError('No command specified!')
+        if self.running:
+            raise RuntimeError('Job already running!')
+        if self.completed and not resubmit:
+            raise RuntimeError('Job is already completed, set '
+                               'resubmit=True to re-run.')
 
         opt_threaded_flag = ""
         cwd_flag = ''
         if n_jobs > 1:
             opt_threaded_flag = "#$ -pe threaded {:d}".format(n_jobs)
-            if not queue == 'isis.q':
+            if not self.queue == 'isis.q':
                 raise ValueError('Make sure you use a parallel queue when '
                                  'submitting jobs with multiple threads.')
         if job_name is None:
@@ -125,8 +133,8 @@ class ClusterJob(object):
         if cwd:
             cwd_flag = '#$ -cwd'
 
-        qsub_script = self._format_qsub_schema(exec_cmd, queue, job_name,
-                                               cwd_flag, opt_threaded_flag)
+        qsub_script = self._create_qsub_script(job_name, cwd_flag,
+                                               opt_threaded_flag)
 
         self._write_qsub_job(qsub_script)
         try:
@@ -144,32 +152,35 @@ class ClusterJob(object):
                 self._delete_qsub_job()
             print('Cluster job submitted, job ID: {0}'.format(self.jobid))
 
-    # override from base class to refer only to this job
-    def status(self):
+    def print_status(self):
         output = subp.check_output(['qstat -u ' + os.environ['USER'] +
                                     ' | grep {0}'.format(self.jobid) +
                                     ' | awk \'{print $5, $8}\''],
                                    stderr=subp.STDOUT, shell=True)
 
         output = output.rstrip()
-        if len(output) == 0:
+        if self.running and len(output) == 0:
             print('Job completed')
             self.completed = True
-            return
-
-        runcode, hostname = output.split(' ')
-        queuename, exechost = hostname.split('@')
-        exechost = exechost.split('.')[0]
-
-        if runcode == 'r':
-            self.running = True
-            print('Running on {0} ({1})'.format(exechost, queuename))
-        elif runcode == 'qw':
             self.running = False
-            print('Waiting in queue ({0})'.format(queuename))
+        else:
+            runcode, hostname = output.split(' ')
+            queuename, exechost = hostname.split('@')
+            exechost = exechost.split('.')[0]
+
+            if runcode == 'r':
+                self.running = True
+                print('Running on {0} ({1})'.format(exechost, queuename))
+            elif runcode == 'qw':
+                self.running = False
+                print('Waiting in queue ({0})'.format(queuename))
 
     def kill(self):
-        print('qdel {:s})'.format(self.jobid))
+        subp.check_output(['qdel {0}'.format(self.jobid)],
+                          stderr=subp.STDOUT, shell=True)
+        print('Job {:s} killed.'.format(self.jobid))
+        self.jobid = None
+        self.running = False
 
 
 # class Maxfilter(ClusterJob):
