@@ -180,10 +180,10 @@ class ClusterJob(object):
                 self.completed = True
         else:
             runcode, hostname = output.split(' ')
-            queuename, exechost = hostname.split('@')
-            exechost = exechost.split('.')[0]
 
             if runcode == 'r':
+                queuename, exechost = hostname.split('@')
+                exechost = exechost.split('.')[0]
                 self.running = True
                 self.completed = False
                 self._status_msg = 'Running on {0} ({1})'.format(exechost,
