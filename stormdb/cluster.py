@@ -225,6 +225,9 @@ class ClusterBatch(object):
             self.logger.setLevel(logging.ERROR)
 
     def __del__(self):
+        self.kill()
+
+    def kill(self):
         for job in self._joblist:
             job.kill()
 

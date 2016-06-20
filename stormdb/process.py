@@ -28,7 +28,7 @@ class MNE_raw_filter():
     def __init__(self):
         pass
 
-    def parse_arguments():
+    def parse_arguments(self):
         argspec = inspect.getargspec(Raw.filter)
         n_pos = len(argspec.args - argspec.defaults)
         args = argspec.args[:n_pos]
