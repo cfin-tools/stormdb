@@ -30,7 +30,7 @@ class MNE_raw_filter():
 
     def parse_arguments(self):
         argspec = inspect.getargspec(Raw.filter)
-        n_pos = len(argspec.args - argspec.defaults)
+        n_pos = len(argspec.args) - len(argspec.defaults)
         args = argspec.args[:n_pos]
         kwargs = {key: val for key, val in zip(argspec.args[n_pos:],
                                                argspec.defaults)}
