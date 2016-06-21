@@ -84,11 +84,22 @@ class ClusterJob(object):
 
         self._qsub_schema = QSUB_SCHEMA
         self.qsub_script = None
-        self.cmd = cmd
+        self._cmd = cmd
         self._jobid = None
         self._running = False
         self._completed = False
         self._status_msg = 'Job not submitted yet'
+
+    @property
+    def cmd(self):
+        return self._cmd
+
+    @cmd.setter
+    def cmd(self, value):
+        if not isinstance(value, string_types):
+            raise RuntimeError('Command should be a single string.')
+        else:
+            self._cmd = value
 
     def _create_qsub_script(self, job_name, cwd_flag, opt_threaded_flag):
         """All variables should be defined"""
@@ -113,9 +124,6 @@ class ClusterJob(object):
 
     def submit(self, n_threads=1, cwd=True, job_name=None, cleanup=True,
                resubmit=False, fake=False):
-
-        if not isinstance(self.cmd, string_types):
-            raise RuntimeError('Command should be a single string.')
 
         self._check_status()
         if self._jobid and not self._completed:
@@ -253,6 +261,11 @@ class ClusterBatch(object):
                 print('\t{0}'.format(job.cmd))
 
     def submit(self, **kwargs):
+        """Submit a batch of jobs.
+
+        See arguments to ClusterJob.submit for details on how to call this
+        method.
+        """
         for job in self._joblist:
             if type(job) is ClusterJob:
                 job.submit(**kwargs)
