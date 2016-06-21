@@ -85,9 +85,9 @@ class ClusterJob(object):
         self._qsub_schema = QSUB_SCHEMA
         self.qsub_script = None
         self.cmd = cmd
-        self.jobid = None
-        self.running = False
-        self.completed = False
+        self._jobid = None
+        self._running = False
+        self._completed = False
         self._status_msg = 'Job not submitted yet'
 
     def _create_qsub_script(self, job_name, cwd_flag, opt_threaded_flag):
@@ -117,16 +117,16 @@ class ClusterJob(object):
         if not isinstance(self.cmd, string_types):
             raise RuntimeError('Command should be a single string.')
 
-        self.check_status()
-        if self.jobid and not self.completed:
-            print('Job {0} was already submitted!'.format(self.jobid))
+        self._check_status()
+        if self._jobid and not self._completed:
+            print('Job {0} was already submitted!'.format(self._jobid))
             return
-        if self.running:
-            print('Job {0} is already running!'.format(self.jobid))
+        if self._running:
+            print('Job {0} is already running!'.format(self._jobid))
             return
-        if self.completed and not resubmit:
+        if self._completed and not resubmit:
             print('Job {0} is already completed, set resubmit=True to '
-                  're-run.'.format(self.jobid))
+                  're-run.'.format(self._jobid))
             return
 
         opt_threaded_flag = ""
@@ -159,51 +159,57 @@ class ClusterJob(object):
         else:
             # print(output.rstrip())
             m = re.search('(\d+)', output.rstrip())
-            self.jobid = m.group(1)
+            self._jobid = m.group(1)
             if cleanup:
                 self._delete_qsub_job()
-            print('Cluster job submitted, job ID: {0}'.format(self.jobid))
+            print('Cluster job submitted, job ID: {0}'.format(self._jobid))
 
     @property
     def status(self):
-        self.check_status()
+        self._check_status()
         return(self._status_msg)
 
-    def check_status(self):
+    def _check_status(self):
         output = subp.check_output(['qstat -u ' + os.environ['USER'] +
-                                    ' | grep {0}'.format(self.jobid) +
+                                    ' | grep {0}'.format(self._jobid) +
                                     ' | awk \'{print $5, $8}\''],
                                    stderr=subp.STDOUT, shell=True)
 
         output = output.rstrip()
         if len(output) == 0:
-            if self.running and not self.completed:
+            if self._running and not self._completed:
                 self._status_msg = 'Job completed'
-                self.running = False
-                self.completed = True
+                self._running = False
+                self._completed = True
         else:
             runcode, hostname = output.split(' ')
 
             if runcode == 'r':
                 queuename, exechost = hostname.split('@')
                 exechost = exechost.split('.')[0]
-                self.running = True
-                self.completed = False
+                self._running = True
+                self._completed = False
                 self._status_msg = 'Running on {0} ({1})'.format(exechost,
                                                                  queuename)
             elif runcode == 'qw':
-                self.running = False
-                self.completed = False
+                self._running = False
+                self._completed = False
                 self._status_msg = 'Waiting in the queue'
 
     def kill(self):
-        subp.check_output(['qdel {0}'.format(self.jobid)],
-                          stderr=subp.STDOUT, shell=True)
-        print('Job {:s} killed.'.format(self.jobid))
-        self.jobid = None
-        self.running = False
-        self.completed = False
-        self._status_msg = 'Job was previously killed.'
+        self._check_status()
+        if self._running:
+            try:
+                subp.check_output(['qdel {0}'.format(self._jobid)],
+                                  stderr=subp.STDOUT, shell=True)
+            except subp.CalledProcessError:
+                raise RuntimeError('This should not happen, report Issue!')
+            else:
+                print('Job {:s} killed.'.format(self._jobid))
+                self._jobid = None
+                self._running = False
+                self._completed = False
+                self._status_msg = 'Job was previously killed.'
 
 
 class ClusterBatch(object):
@@ -224,9 +230,6 @@ class ClusterBatch(object):
         else:
             self.logger.setLevel(logging.ERROR)
 
-    def __del__(self):
-        self.kill()
-
     def kill(self):
         for job in self._joblist:
             job.kill()
@@ -243,12 +246,12 @@ class ClusterBatch(object):
         self._joblist += [ClusterJob(cmd, self.proj_name, queue=queue)]
 
     @property
-    def status(self):
-        statlist = []
+    def status(self, verbose=False):
         for job in self._joblist:
-            job.check_status()
-            statlist += [job.status]
-        return(statlist)
+            job._check_status()
+            print('{0}: {1}'.format(job._jobid, job.status))
+            if verbose:
+                print('\t{0}'.format(job.cmd))
 
     def submit(self, **kwargs):
         for job in self._joblist:
