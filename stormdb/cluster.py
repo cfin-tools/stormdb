@@ -245,8 +245,7 @@ class ClusterBatch(object):
     def add_job(self, cmd, queue='short.q'):
         self._joblist += [ClusterJob(cmd, self.proj_name, queue=queue)]
 
-    @property
-    def status(self, verbose=False):
+    def print_status(self, verbose=False):
         for job in self._joblist:
             job._check_status()
             print('{0}: {1}'.format(job._jobid, job.status))
