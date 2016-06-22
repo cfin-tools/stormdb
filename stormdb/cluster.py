@@ -70,17 +70,13 @@ class Cluster(object):
 
 class ClusterJob(object):
     ''''''
-    def __init__(self, cmd=None, proj_name=None, queue='short.q'):
+    def __init__(self, cmd=None, proj_name=None):
         self.cluster = Cluster()
 
         if not proj_name:
             raise(ValueError('Jobs are associated with a specific project.'))
         Query(proj_name)._check_proj_name()  # let fail if bad proj_name
         self.proj_name = proj_name
-
-        if queue not in self.cluster.nodes:
-            raise ValueError('Unknown queue ({0})!'.format(queue))
-        self.queue = queue
 
         self._qsub_schema = QSUB_SCHEMA
         self.qsub_script = None
@@ -122,8 +118,11 @@ class ClusterJob(object):
         """Delete temp .sh"""
         os.unlink(sh_file)
 
-    def submit(self, n_threads=1, cwd=True, job_name=None, cleanup=True,
-               resubmit=False, fake=False):
+    def submit(self, queue='short.q', n_threads=1, cwd=True, job_name=None,
+               cleanup=True, resubmit=False, fake=False):
+
+        if queue not in self.cluster.nodes:
+            raise ValueError('Unknown queue ({0})!'.format(queue))
 
         self._check_status()
         if self._jobid and not self._completed:
@@ -141,7 +140,7 @@ class ClusterJob(object):
         cwd_flag = ''
         if n_threads > 1:
             opt_threaded_flag = "#$ -pe threaded {:d}".format(n_threads)
-            if not self.queue == 'isis.q':
+            if not queue == 'isis.q':
                 raise ValueError('Make sure you use a parallel queue when '
                                  'submitting jobs with multiple threads.')
         if job_name is None:
@@ -250,8 +249,8 @@ class ClusterBatch(object):
         cmdlist = [job.cmd for job in self._joblist]
         return cmdlist
 
-    def add_job(self, cmd, queue='short.q'):
-        self._joblist += [ClusterJob(cmd, self.proj_name, queue=queue)]
+    def add_job(self, cmd):
+        self._joblist += [ClusterJob(cmd, self.proj_name)]
 
     def print_status(self, verbose=False):
         for job in self._joblist:
