@@ -81,6 +81,7 @@ class ClusterJob(object):
 
         if queue not in self.cluster.nodes:
             raise ValueError('Unknown queue ({0})!'.format(queue))
+        self.queue = queue
 
         self._qsub_schema = QSUB_SCHEMA
         self.qsub_script = None
