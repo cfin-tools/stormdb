@@ -51,10 +51,10 @@ class MNEPython(ClusterBatch):
                   'raw.save(\'{out_fname:s}\')')
         filtargs = ', '.join("{!s}={!r}".format(key, val) for
                              (key, val) in kwargs.items())
-        cmd = 'python -c \"'
+        cmd = 'python -c \\"'
         cmd += script.format(in_fname=in_fname, out_fname=out_fname,
                              l_freq=l_freq, h_freq=h_freq, kwargs=filtargs)
-        cmd += '\"'
+        cmd += '\\"'
 
         self.add_job(cmd, n_threads=1)
         self.info['io_mapping'] += [dict(input=in_fname, output=out_fname)]
