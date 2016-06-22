@@ -11,7 +11,7 @@ Credits:
 # Author: Chris Bailey <cjb@cfin.au.dk>
 #
 # License: BSD (3-clause)
-# import logging
+import os
 import warnings
 import inspect
 import numpy as np
@@ -22,19 +22,44 @@ from mne.bem import fit_sphere_to_headshape
 from .cluster import ClusterBatch
 
 
-class MNE_raw_filter():
+class MNEPython(ClusterBatch):
     """ Foo
     """
-    def __init__(self):
-        pass
+    def __init__(self, proj_name, bad=[], verbose=True):
+        super(MNEPython, self).__init__(proj_name)
 
-    def parse_arguments(self):
-        argspec = inspect.getargspec(Raw.filter)
+        self.info = dict(bad=bad, io_mapping=[])
+
+    def parse_arguments(self, func):
+        # argspec = inspect.getargspec(Raw.filter)
+        argspec = inspect.getargspec(func)
         n_pos = len(argspec.args) - len(argspec.defaults)
-        args = argspec.args[:n_pos]
+        args = argspec.args[1:n_pos]  # drop self
         kwargs = {key: val for key, val in zip(argspec.args[n_pos:],
                                                argspec.defaults)}
         return(args, kwargs)
+
+    def raw_filter(self, in_fname, out_fname, l_freq, h_freq, **kwargs):
+        if not check_source_readable(in_fname):
+            raise IOError('Input file {0} not readable!'.format(in_fname))
+        if not check_destination_writable(out_fname):
+            raise IOError('Output file {0} not writable!'.format(out_fname))
+
+        script = """
+        from mne.io import read_raw_fiff
+        raw = read_raw_fif({in_fname:s}, preload=True)
+        raw.filter({l_freq:}, {h_freq:}, {kwargs:})
+        raw.save({out_fname:s})
+        """
+        filtargs = ', '.join("{!s}={!r}".format(key, val) for
+                             (key, val) in kwargs.items())
+        cmd = 'python << EOF '
+        cmd += script.format(in_fname=in_fname, out_fname=out_fname,
+                             l_freq=l_freq, h_freq=h_freq, kwargs=filtargs)
+        cmd += 'EOF'
+
+        self.add_job(cmd, queue='short.q', n_threads=1)
+        self.info['io_mapping'] += [dict(input=in_fname, output=out_fname)]
 
 
 class Maxfilter(ClusterBatch):
@@ -62,61 +87,6 @@ class Maxfilter(ClusterBatch):
 
         self.info = dict(bad=bad, io_mapping=[])
         # Consider placing other vars here
-
-    # def detect_bad_chans_xscan(self, in_fname, use_tsss=False, n_jobs=1,
-    #                            xscan_bin=None, set_bad=True):
-    #     """Experimental method from Elekta for detecting bad channels
-    #
-    #     WARNING! Use at own risk, not documented/fully tested!
-    #
-    #     Parameters
-    #     ----------
-    #     in_fname : str
-    #         Input file name
-    #     use_tsss : bool
-    #         If True, uses tSSS-based bad channel estimation (slow!). Default
-    #         is False: use tSSS for particularly bad artefacts like dentals.
-    #     xscan_bin : str
-    #         Full path to xscan-binary (if None, default in /neuro/bin is used)
-    #     set_bad : bool
-    #         Set the channels found by xscan as bad in the Maxfilter object
-    #         (default: True). NB: bad-list is amended, not replaced!
-    #     """
-    #     _check_n_jobs(n_jobs)
-    #
-    #     if xscan_bin is None:
-    #         xscan_bin = '/neuro/bin/util/xscan'
-    #
-    #     # Start building command
-    #     cmd = [xscan_bin, '-v', '-f', '{:s}'.format(in_fname)]
-    #
-    #     proc = subp.Popen(cmd, shell=True, stdout=subp.PIPE)
-    #     stdout = proc.communicate()[0]  # read stdout
-    #     retcode = proc.wait()
-    #
-    #     if retcode != 0:
-    #         if retcode == 127:
-    #             raise NameError('xscan binary ' + xscan_bin + ' not found')
-    #         else:
-    #             errmsg = 'xscan exited with an error, output is:\n\n' + stdout
-    #             raise RuntimeError(errmsg)
-    #
-    #     # CHECKME!
-    #     bads_str = []
-    #     for il in range(2):
-    #         row = stdout[-1*il]
-    #         idx = row.find('Static')
-    #         if idx > 0 and ('flat' in row or 'bad' in row):
-    #             idx = row.find('): ')
-    #             bads_str += [row[idx + 3]]
-    #
-    #     self.logger.info('xscan detected the following bad channels:\n' +
-    #                      bads_str)
-    #     if set_bad:
-    #         new_bads = bads_str.split()
-    #         uniq_bads = [b for b in new_bads if b not in self.bad]
-    #         self.info['bad'] = uniq_bads
-    #         self.logger.info('Maxfilter object bad channel list updated')
 
     def build_cmd(self, in_fname, out_fname, origin='0 0 40',
                   frame='head', bad=None, autobad='off', skip=None,
@@ -197,6 +167,11 @@ class Maxfilter(ClusterBatch):
         mx_args : str
             Additional command line arguments to pass to MaxFilter
         """
+        if not check_source_readable(in_fname):
+            raise IOError('Input file {0} not readable!'.format(in_fname))
+        if not check_destination_writable(out_fname):
+            raise IOError('Output file {0} not writable!'.format(out_fname))
+
         # determine the head origin if necessary
         if origin is None:
             self.logger.info('Estimating head origin from headshape points..')
@@ -303,6 +278,71 @@ class Maxfilter(ClusterBatch):
         self.add_job(cmd, queue='isis.q')
         self.info['io_mapping'] += [dict(input=in_fname, output=out_fname)]
 
+
+def Xscan(Maxfilter):
+    """Elekta xscan: SSS-based bad channel detection.
+    """
+    def __init__(self, proj_name, bad=[], verbose=True):
+        super(Xscan, self).__init__(proj_name)
+
+        self.info = dict(bad=bad, io_mapping=[])
+
+    # def detect_bad_chans_xscan(self, in_fname, use_tsss=False, n_jobs=1,
+    #                            xscan_bin=None, set_bad=True):
+    #     """Experimental method from Elekta for detecting bad channels
+    #
+    #     WARNING! Use at own risk, not documented/fully tested!
+    #
+    #     Parameters
+    #     ----------
+    #     in_fname : str
+    #         Input file name
+    #     use_tsss : bool
+    #         If True, uses tSSS-based bad channel estimation (slow!). Default
+    #         is False: use tSSS for particularly bad artefacts like dentals.
+    #     xscan_bin : str
+    #         Full path to xscan-binary (if None, default in /neuro/bin is used)
+    #     set_bad : bool
+    #         Set the channels found by xscan as bad in the Maxfilter object
+    #         (default: True). NB: bad-list is amended, not replaced!
+    #     """
+    #     _check_n_jobs(n_jobs)
+    #
+    #     if xscan_bin is None:
+    #         xscan_bin = '/neuro/bin/util/xscan'
+    #
+    #     # Start building command
+    #     cmd = [xscan_bin, '-v', '-f', '{:s}'.format(in_fname)]
+    #
+    #     proc = subp.Popen(cmd, shell=True, stdout=subp.PIPE)
+    #     stdout = proc.communicate()[0]  # read stdout
+    #     retcode = proc.wait()
+    #
+    #     if retcode != 0:
+    #         if retcode == 127:
+    #             raise NameError('xscan binary ' + xscan_bin + ' not found')
+    #         else:
+    #             errmsg = 'xscan exited with an error, output is:\n\n' + stdout
+    #             raise RuntimeError(errmsg)
+    #
+    #     # CHECKME!
+    #     bads_str = []
+    #     for il in range(2):
+    #         row = stdout[-1*il]
+    #         idx = row.find('Static')
+    #         if idx > 0 and ('flat' in row or 'bad' in row):
+    #             idx = row.find('): ')
+    #             bads_str += [row[idx + 3]]
+    #
+    #     self.logger.info('xscan detected the following bad channels:\n' +
+    #                      bads_str)
+    #     if set_bad:
+    #         new_bads = bads_str.split()
+    #         uniq_bads = [b for b in new_bads if b not in self.bad]
+    #         self.info['bad'] = uniq_bads
+    #         self.logger.info('Maxfilter object bad channel list updated')
+
+
 #     def submit_to_cluster(self, n_jobs=1, fake=False):
 #         """ Submit the command built earlier for processing on the cluster.
 #
@@ -341,3 +381,23 @@ class Maxfilter(ClusterBatch):
 #         raise ValueError('isis only has 12 cores!')
 #     elif n_jobs < 1 or type(n_jobs) is not int:
 #         raise ValueError('number of jobs must be a positive integer!')
+
+
+def check_destination_writable(dest):
+    try:
+        open(dest, 'w')
+    except IOError:
+        return False
+    else:
+        os.remove(dest)
+        return True
+
+
+def check_source_readable(source):
+    try:
+        fid = open(source, 'r')
+    except IOError:
+        return False
+    else:
+        fid.close()
+        return True
