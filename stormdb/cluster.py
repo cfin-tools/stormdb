@@ -88,6 +88,7 @@ class ClusterJob(object):
         self._cmd = cmd
         self._jobid = None
         self._running = False
+        self._waiting = False
         self._completed = False
         self._status_msg = 'Job not submitted yet'
         self._cleanup_qsub_job = cleanup
@@ -148,6 +149,9 @@ class ClusterJob(object):
         if self._running:
             print('Job {0} is already running!'.format(self._jobid))
             return
+        if self._waiting:
+            print('Job {0} is already waiting!'.format(self._jobid))
+            return
         if self._completed:
             print('Job {0} is already completed, re-create job to '
                   're-run.'.format(self._jobid))
@@ -187,7 +191,10 @@ class ClusterJob(object):
 
         output = output.rstrip()
         if len(output) == 0:
-            if self._running and not self._completed:
+            if not self._running and not self._completed and not self._waiting:
+                self._status_msg = 'Job submission failed, see output errors!'
+                self._jobid = None
+            elif self._running and not self._completed:
                 self._status_msg = 'Job completed'
                 self._running = False
                 self._completed = True
@@ -198,11 +205,13 @@ class ClusterJob(object):
                 queuename, exechost = hostname.split('@')
                 exechost = exechost.split('.')[0]
                 self._running = True
+                self._waiting = False
                 self._completed = False
                 self._status_msg = 'Running on {0} ({1})'.format(exechost,
                                                                  queuename)
             elif runcode == 'qw':
                 self._running = False
+                self._waiting = True
                 self._completed = False
                 self._status_msg = 'Waiting in the queue'
 
