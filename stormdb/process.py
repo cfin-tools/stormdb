@@ -58,7 +58,7 @@ class MNEPython(ClusterBatch):
                              l_freq=l_freq, h_freq=h_freq, kwargs=filtargs)
         cmd += 'EOF'
 
-        self.add_job(cmd, queue='short.q', n_threads=1)
+        self.add_job(cmd, n_threads=1)
         self.info['io_mapping'] += [dict(input=in_fname, output=out_fname)]
 
 

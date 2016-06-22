@@ -70,13 +70,17 @@ class Cluster(object):
 
 class ClusterJob(object):
     ''''''
-    def __init__(self, cmd=None, proj_name=None):
+    def __init__(self, cmd=None, proj_name=None, queue='short.q', n_threads=1,
+                 cwd=True, job_name=None, cleanup=True):
         self.cluster = Cluster()
 
         if not proj_name:
             raise(ValueError('Jobs are associated with a specific project.'))
         Query(proj_name)._check_proj_name()  # let fail if bad proj_name
         self.proj_name = proj_name
+
+        if queue not in self.cluster.nodes:
+            raise ValueError('Unknown queue ({0})!'.format(queue))
 
         self._qsub_schema = QSUB_SCHEMA
         self.qsub_script = None
@@ -85,6 +89,22 @@ class ClusterJob(object):
         self._running = False
         self._completed = False
         self._status_msg = 'Job not submitted yet'
+        self._cleanup_qsub_job = cleanup
+
+        opt_threaded_flag = ""
+        cwd_flag = ''
+        if n_threads > 1:
+            opt_threaded_flag = "#$ -pe threaded {:d}".format(n_threads)
+            if not queue == 'isis.q':
+                raise ValueError('Make sure you use a parallel queue when '
+                                 'submitting jobs with multiple threads.')
+        if job_name is None:
+            job_name = 'py-wrapper'
+        if cwd:
+            cwd_flag = '#$ -cwd'
+
+        self._create_qsub_script(job_name, cwd_flag,
+                                 opt_threaded_flag)
 
     @property
     def cmd(self):
@@ -118,11 +138,7 @@ class ClusterJob(object):
         """Delete temp .sh"""
         os.unlink(sh_file)
 
-    def submit(self, queue='short.q', n_threads=1, cwd=True, job_name=None,
-               cleanup=True, resubmit=False, fake=False):
-
-        if queue not in self.cluster.nodes:
-            raise ValueError('Unknown queue ({0})!'.format(queue))
+    def submit(self, fake=False):
 
         self._check_status()
         if self._jobid and not self._completed:
@@ -131,25 +147,11 @@ class ClusterJob(object):
         if self._running:
             print('Job {0} is already running!'.format(self._jobid))
             return
-        if self._completed and not resubmit:
-            print('Job {0} is already completed, set resubmit=True to '
+        if self._completed:
+            print('Job {0} is already completed, re-create job to '
                   're-run.'.format(self._jobid))
             return
 
-        opt_threaded_flag = ""
-        cwd_flag = ''
-        if n_threads > 1:
-            opt_threaded_flag = "#$ -pe threaded {:d}".format(n_threads)
-            if not queue == 'isis.q':
-                raise ValueError('Make sure you use a parallel queue when '
-                                 'submitting jobs with multiple threads.')
-        if job_name is None:
-            job_name = 'py-wrapper'
-        if cwd:
-            cwd_flag = '#$ -cwd'
-
-        self._create_qsub_script(job_name, cwd_flag,
-                                 opt_threaded_flag)
         if fake:
             print('Following script would be submitted (if not fake)')
             print(self.qsub_script)
@@ -167,7 +169,7 @@ class ClusterJob(object):
             # print(output.rstrip())
             m = re.search('(\d+)', output.rstrip())
             self._jobid = m.group(1)
-            if cleanup:
+            if self._cleanup_qsub_job:
                 self._delete_qsub_job()
             print('Cluster job submitted, job ID: {0}'.format(self._jobid))
 
@@ -249,8 +251,12 @@ class ClusterBatch(object):
         cmdlist = [job.cmd for job in self._joblist]
         return cmdlist
 
-    def add_job(self, cmd):
-        self._joblist += [ClusterJob(cmd, self.proj_name)]
+    def add_job(self, cmd, **kwargs):
+        # queue='short.q', n_threads=1,
+        #         cwd=True, job_name=None, cleanup=True):
+        """See ClusterJob for arguments!
+        """
+        self._joblist += [ClusterJob(cmd, self.proj_name, **kwargs)]
 
     def print_status(self, verbose=False):
         for job in self._joblist:
@@ -259,7 +265,7 @@ class ClusterBatch(object):
             if verbose:
                 print('\t{0}'.format(job.cmd))
 
-    def submit(self, **kwargs):
+    def submit(self, fake=False):
         """Submit a batch of jobs.
 
         See arguments to ClusterJob.submit for details on how to call this
@@ -267,7 +273,7 @@ class ClusterBatch(object):
         """
         for job in self._joblist:
             if type(job) is ClusterJob:
-                job.submit(**kwargs)
+                job.submit(fake=fake)
             else:
                 raise ValueError('This should never happen, report an Issue!')
 # class Maxfilter(ClusterJob):

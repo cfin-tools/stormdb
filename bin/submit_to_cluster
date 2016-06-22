@@ -31,5 +31,6 @@ if args.project is None:
         raise RuntimeError(msg)
 proj_name = args.project
 
-job = ClusterJob(args.exec_cmd, proj_name=proj_name)
-job.submit(n_threads=args.n_threads, cleanup=args.noclean, queue=args.queue)
+job = ClusterJob(args.exec_cmd, proj_name=proj_name, n_threads=args.n_threads,
+                 cleanup=args.noclean, queue=args.queue)
+job.submit()
