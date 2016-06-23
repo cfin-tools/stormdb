@@ -92,6 +92,7 @@ class ClusterJob(object):
         self._running = False
         self._waiting = False
         self._completed = False
+        self._submitted = False
         self._status_msg = 'Job not submitted yet'
         self._cleanup_qsub_job = cleanup
 
@@ -145,18 +146,19 @@ class ClusterJob(object):
     def submit(self, fake=False):
 
         self._check_status()
-        if self._jobid and not self._completed:
-            print('Job {0} was already submitted!'.format(self._jobid))
-            return
-        if self._running:
-            print('Job {0} is already running!'.format(self._jobid))
-            return
-        if self._waiting:
-            print('Job {0} is already waiting!'.format(self._jobid))
-            return
-        if self._completed:
-            print('Job {0} is already completed, re-create job to '
-                  're-run.'.format(self._jobid))
+        if self._submitted:
+            if self._running:
+                print('Job {0} is already running!'.format(self._jobid))
+                return
+            elif self._waiting:
+                print('Job {0} is already waiting!'.format(self._jobid))
+                return
+            elif self._completed:
+                print('Job {0} is already completed, re-create job to '
+                      're-run.'.format(self._jobid))
+                return
+        else:
+            print('Job {0} was already submitted.'.format(self._jobid))
             return
 
         if fake:
@@ -179,6 +181,7 @@ class ClusterJob(object):
             if self._cleanup_qsub_job:
                 self._delete_qsub_job()
             print('Cluster job submitted, job ID: {0}'.format(self._jobid))
+            self._submitted = True
 
     @property
     def status(self):
@@ -186,6 +189,8 @@ class ClusterJob(object):
         return(self._status_msg)
 
     def _check_status(self):
+        if self._completed:
+            return
         output = subp.check_output(['qstat -u ' + os.environ['USER'] +
                                     ' | grep {0}'.format(self._jobid) +
                                     ' | awk \'{print $5, $8}\''],
@@ -193,16 +198,15 @@ class ClusterJob(object):
 
         output = output.rstrip()
         if len(output) == 0:
-            if (not self._running and not self._completed and
-                    self._jobid is not None and not self._waiting):
-                self._status_msg = 'Job submission failed, see output errors!'
-                self._jobid = None
-            elif (self._running and not self._completed and
-                    self._jobid is not None):
-                self._status_msg = 'Job completed'
-                self._running = False
-                self._completed = True
-                self._jobid = None
+            if (self._submitted and not self._running and
+                    not self._completed and not self._waiting):
+                self._status_msg = ('Submission failed, see log for'
+                                    ' output errors!')
+            elif self._submitted and not self._completed:
+                if self._running:
+                    self._status_msg = 'Job completed'
+                    self._running, self._waiting = False, False
+                    self._completed = True
         else:
             runcode, hostname = output.split(' ')
 
@@ -228,16 +232,17 @@ class ClusterJob(object):
 
     def kill(self):
         self._check_status()
-        if self._running:
+        if self._submitted and (self._running or self._waiting):
             try:
                 subp.check_output(['qdel {0}'.format(self._jobid)],
                                   stderr=subp.STDOUT, shell=True)
             except subp.CalledProcessError:
                 raise RuntimeError('This should not happen, report Issue!')
             else:
-                print('Job {:s} killed.'.format(self._jobid))
-                self._jobid = None
+                print('Job {:s} killed. You must manually delete any output '
+                      'it may have created!'.format(self._jobid))
                 self._running = False
+                self._waiting = False
                 self._completed = False
                 self._status_msg = 'Job was previously killed.'
 
@@ -257,7 +262,20 @@ class ClusterBatch(object):
             self.logger.propagate = False
             stdout_stream = logging.StreamHandler(sys.stdout)
             self.logger.addHandler(stdout_stream)
-        if verbose:
+        self.verbose = verbose
+
+    @property
+    def verbose(self):
+        if self.logger.getLevel() > logging.DEBUG:
+            return False
+        else:
+            return True
+
+    @verbose.setter
+    def verbose(self, value):
+        if not isinstance(value, bool):
+            raise RuntimeError('Set verbose to True or False!')
+        elif value is True:
             self.logger.setLevel(logging.DEBUG)
         else:
             self.logger.setLevel(logging.INFO)
@@ -283,9 +301,10 @@ class ClusterBatch(object):
 
     @property
     def status(self):
-        for job in self._joblist:
-            job._check_status()
-            self.logger.info('{0}: {1}'.format(job._jobid, job.status))
+        for ij, job in enumerate(self._joblist):
+            self.logger.info('#{ij:d} ({jid:}): '
+                             '{jst}'.format(ij=ij + 1, jid=job._jobid,
+                                            jst=job.status))
             self.logger.debug('\t{0}'.format(job.cmd))
 
     def submit(self, fake=False):
