@@ -35,10 +35,9 @@ QSUB_SCHEMA = """
 export OMP_NUM_THREADS=$NSLOTS
 
 echo "Executing following command on $NSLOTS threads:"
+# echo {exec_cmd:s}  # echo not safe with quotes and pipes!
 
-echo {exec_cmd:s}
-#eval "{exec_cmd:s}"
-{exec_cmd:s}
+{exec_cmd:s}  # remember to escape quotes on command-liners!
 
 echo "Done executing"
 """
