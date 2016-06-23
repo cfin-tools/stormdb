@@ -38,7 +38,7 @@ export OMP_NUM_THREADS=$NSLOTS
 echo "Executing following command on $NSLOTS threads:"
 
 echo "{exec_cmd:s}"
-eval "{exec_cmd:s}"
+eval "{exec_cmd:s}"  # this doesn't seem to work in a qsub!
 
 echo "Done executing"
 """
@@ -74,6 +74,8 @@ class ClusterJob(object):
                  cwd=True, job_name=None, cleanup=True):
         self.cluster = Cluster()
 
+        if not cmd:
+            raise(ValueError('You must specify the command to run!'))
         if not proj_name:
             raise(ValueError('Jobs are associated with a specific project.'))
         Query(proj_name)._check_proj_name()  # let fail if bad proj_name
@@ -191,13 +193,16 @@ class ClusterJob(object):
 
         output = output.rstrip()
         if len(output) == 0:
-            if not self._running and not self._completed and not self._waiting:
+            if (not self._running and not self._completed and
+                    self._jobid is not None and not self._waiting):
                 self._status_msg = 'Job submission failed, see output errors!'
                 self._jobid = None
-            elif self._running and not self._completed:
+            elif (self._running and not self._completed and
+                    self._jobid is not None):
                 self._status_msg = 'Job completed'
                 self._running = False
                 self._completed = True
+                self._jobid = None
         else:
             runcode, hostname = output.split(' ')
 
@@ -214,6 +219,12 @@ class ClusterJob(object):
                 self._waiting = True
                 self._completed = False
                 self._status_msg = 'Waiting in the queue'
+            else:
+                self._running = False
+                self._waiting = True
+                self._completed = False
+                self._status_msg = ('Queue status odd (qstat says: {0}), '
+                                    'please check!'.format(runcode))
 
     def kill(self):
         self._check_status()
@@ -232,7 +243,7 @@ class ClusterJob(object):
 
 
 class ClusterBatch(object):
-    """Many ClusterJob's together
+    """Many ClusterJob's to be submitted together as a batch
     """
     def __init__(self, proj_name, verbose=False):
         self.cluster = Cluster()
@@ -245,9 +256,9 @@ class ClusterBatch(object):
         stdout_stream = logging.StreamHandler(sys.stdout)
         self.logger.addHandler(stdout_stream)
         if verbose:
-            self.logger.setLevel(logging.INFO)
+            self.logger.setLevel(logging.DEBUG)
         else:
-            self.logger.setLevel(logging.ERROR)
+            self.logger.setLevel(logging.INFO)
 
     def kill(self):
         for job in self._joblist:
@@ -268,18 +279,20 @@ class ClusterBatch(object):
         """
         self._joblist += [ClusterJob(cmd, self.proj_name, **kwargs)]
 
-    def print_status(self, verbose=False):
+    @property
+    def status(self):
         for job in self._joblist:
             job._check_status()
-            print('{0}: {1}'.format(job._jobid, job.status))
-            if verbose:
-                print('\t{0}'.format(job.cmd))
+            self.logger.info('{0}: {1}'.format(job._jobid, job.status))
+            self.logger.debug('\t{0}'.format(job.cmd))
 
     def submit(self, fake=False):
         """Submit a batch of jobs.
 
-        See arguments to ClusterJob.submit for details on how to call this
-        method.
+        Parameters
+        ----------
+        fake : bool
+            If True, show what would be submitted (but don't actually submit).
         """
         for job in self._joblist:
             if type(job) is ClusterJob:
