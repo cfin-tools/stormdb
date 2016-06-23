@@ -94,7 +94,7 @@ class Maxfilter(ClusterBatch):
                   hpisubt=None, hpicons=True, linefreq=None,
                   cal=None, ctc=None, mx_args='',
                   maxfilter_bin='/neuro/bin/util/maxfilter',
-                  logfile=None):
+                  logfile=None, n_threads=4):
 
         """Build a NeuroMag MaxFilter command for later execution.
 
@@ -110,6 +110,8 @@ class Maxfilter(ClusterBatch):
             Input file name
         out_fname : str
             Output file name
+        n_threads : int
+            Number of parallel threads to execute on (default: 4)
         maxfilter_bin : str
             Full path to the maxfilter-executable
         logfile : str
@@ -273,7 +275,7 @@ class Maxfilter(ClusterBatch):
         if logfile:
             cmd += ' | tee ' + logfile
 
-        self.add_job(cmd, queue='isis.q')
+        self.add_job(cmd, queue='isis.q', n_threads=n_threads)
         self.info['io_mapping'] += [dict(input=in_fname, output=out_fname)]
 
 
