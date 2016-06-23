@@ -18,8 +18,8 @@ from six import string_types
 from .access import Query
 
 
-QSUB_SCHEMA = """#!/bin/bash
-
+QSUB_SCHEMA = """
+#$ -S /bin/bash
 # Pass on all environment variables
 #$ -V
 # Operate in current working directory
@@ -37,7 +37,7 @@ export OMP_NUM_THREADS=$NSLOTS
 echo "Executing following command on $NSLOTS threads:"
 
 echo "{exec_cmd:s}"
-eval "{exec_cmd:s}"  # this doesn't seem to work in a qsub!
+eval "{exec_cmd:s}"
 
 echo "Done executing"
 """
