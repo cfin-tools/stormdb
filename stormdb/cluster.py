@@ -18,8 +18,7 @@ from six import string_types
 from .access import Query
 
 
-QSUB_SCHEMA = """
-#!/bin/bash
+QSUB_SCHEMA = """#!/bin/bash
 
 # Pass on all environment variables
 #$ -V
