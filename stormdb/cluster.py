@@ -282,7 +282,7 @@ class ClusterBatch(object):
 
     def kill(self, jobid=None):
         for job in self._joblist:
-            if jobid is not None and job._jobid == int(jobid):
+            if jobid is not None and int(job._jobid) == int(jobid):
                 job.kill()
 
     def build_cmd(self):
