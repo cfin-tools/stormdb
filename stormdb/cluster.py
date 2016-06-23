@@ -157,9 +157,9 @@ class ClusterJob(object):
                 print('Job {0} is already completed, re-create job to '
                       're-run.'.format(self._jobid))
                 return
-        else:
-            print('Job {0} was already submitted.'.format(self._jobid))
-            return
+            else:
+                print('Job {0} was already submitted.'.format(self._jobid))
+                return
 
         if fake:
             print('Following script would be submitted (if not fake)')
