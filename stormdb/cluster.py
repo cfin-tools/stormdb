@@ -280,9 +280,10 @@ class ClusterBatch(object):
         else:
             self.logger.setLevel(logging.INFO)
 
-    def kill(self):
+    def kill(self, jobid=None):
         for job in self._joblist:
-            job.kill()
+            if jobid is not None and job._jobid == int(jobid):
+                job.kill()
 
     def build_cmd(self):
         raise RuntimeError('This should be overriden in subclasses!')
