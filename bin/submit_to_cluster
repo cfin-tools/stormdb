@@ -29,7 +29,8 @@ if args.project is None:
                '--project flag or by setting the MINDLABPROJ environment '
                'variable (e.g. in your .bashrc file).')
         raise RuntimeError(msg)
-proj_name = args.project
+else:
+    proj_name = args.project
 
 job = ClusterJob(args.exec_cmd, proj_name=proj_name, n_threads=args.n_threads,
                  cleanup=args.noclean, queue=args.queue)
