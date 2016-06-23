@@ -37,7 +37,8 @@ export OMP_NUM_THREADS=$NSLOTS
 echo "Executing following command on $NSLOTS threads:"
 
 echo "{exec_cmd:s}"
-eval "{exec_cmd:s}"
+#eval "{exec_cmd:s}"
+{exec_cmd:s}
 
 echo "Done executing"
 """

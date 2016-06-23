@@ -45,16 +45,16 @@ class MNEPython(ClusterBatch):
         if not check_destination_writable(out_fname):
             raise IOError('Output file {0} not writable!'.format(out_fname))
 
-        script = ('from mne.io import read_raw_fif;'
-                  'raw = read_raw_fif(\'{in_fname:s}\', preload=True);'
-                  'raw.filter({l_freq:}, {h_freq:}, {kwargs:});'
-                  'raw.save(\'{out_fname:s}\')')
+        script = ("from mne.io import read_raw_fif;"
+                  "raw = read_raw_fif('{in_fname:s}', preload=True);"
+                  "raw.filter({l_freq:}, {h_freq:}, {kwargs:});"
+                  "raw.save('{out_fname:s}')")
         filtargs = ', '.join("{!s}={!r}".format(key, val) for
                              (key, val) in kwargs.items())
-        cmd = 'python -c \\"'
+        cmd = "python -c \""
         cmd += script.format(in_fname=in_fname, out_fname=out_fname,
                              l_freq=l_freq, h_freq=h_freq, kwargs=filtargs)
-        cmd += '\\"'
+        cmd += "\""
 
         self.add_job(cmd, n_threads=1)
         self.info['io_mapping'] += [dict(input=in_fname, output=out_fname)]
