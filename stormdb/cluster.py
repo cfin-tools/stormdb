@@ -251,10 +251,12 @@ class ClusterBatch(object):
         self.proj_name = proj_name
         self._joblist = []
 
-        self.logger = logging.getLogger('__name__')
-        self.logger.propagate = False
-        stdout_stream = logging.StreamHandler(sys.stdout)
-        self.logger.addHandler(stdout_stream)
+        self.logger = logging.getLogger('ClusterBatchLogger')
+        # Only create a new handler if none exist
+        if len(self.logger.handlers) == 0:
+            self.logger.propagate = False
+            stdout_stream = logging.StreamHandler(sys.stdout)
+            self.logger.addHandler(stdout_stream)
         if verbose:
             self.logger.setLevel(logging.DEBUG)
         else:
