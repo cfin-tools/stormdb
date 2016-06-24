@@ -15,6 +15,7 @@ import requests
 from requests import ConnectionError
 import urllib
 import re
+from six import string_types
 
 
 class DBError(Exception):
@@ -336,7 +337,7 @@ class Query(object):
 
         return(file_list)
 
-    def filter_series(self, description, subj_ids='', modalities='MEG',
+    def filter_series(self, description, subjects=[], modalities='MEG',
                       study_metas='', return_files=True):
         """Select series based on their description (name)
 
@@ -349,14 +350,14 @@ class Query(object):
         description : str
             A string containing the name of the series to extract. The
             asterisk ('*') may be used as a wildcard.
-        subj_ids : str
-            A pipe-separated ('|') string identifying one or more subjects in
-            the database. For example: '0001_ABC|0010_XYZ'. The empty string
-            ('', default) is equivalent to all non-excluded subjects.
-        modalities : str
-            A string defining the modalities of the study to get. Modalities
-            can be separated using a pipe (|), e.g., 'MEG|MR'. Default: 'MEG'
-             The empty string ('') is equivalent to all modalities.
+        subjects : str or list of str
+            A string or list or strings identifying one or more subjects in
+            the database. For example: ['0001_ABC', 0010_XYZ']. An empty string
+            or list ('', default) is equivalent to all non-excluded subjects.
+        modalities : str or list of str
+            A string or list or strings identifying one or more modalities of
+            the study to get. Default: 'MEG', the empty string/list is
+            equivalent to all modalities.
         study_metas : dict or None
             A dictionary with fields "name", "comparison" and "value", e.g.,
             dict(name='timepoint', comparison='=', value=2). By default all
@@ -374,6 +375,9 @@ class Query(object):
                 The database subject code in the form NNNN_XYZ
             path : str
                 path to files
+            seriename : str
+                name of the series (corresponding to the name of the original
+                data file in MEG/EEG)
             files : list of str
                 list of strings with file names
         """
@@ -384,6 +388,24 @@ class Query(object):
         meta_str = ''
         outp = ''
         removeProjects = ''
+
+        if isinstance(subjects, list):
+            try:
+                subjects = '|'.join(subjects)
+            except TypeError:
+                raise DBError('When using a list of subjects, each element '
+                              'must be a string.')
+        elif not isinstance(subjects, string_types):
+            raise DBError('subjects-parameter must be str or list of str')
+
+        if isinstance(modalities, list):
+            try:
+                subjects = '|'.join(modalities)
+            except TypeError:
+                raise DBError('When using a list of modalities, each element '
+                              'must be a string.')
+        elif not isinstance(modalities, string_types):
+            raise DBError('modalities-parameter must be str or list of str')
 
         if isinstance(study_metas, dict):
             # do some checking here...
