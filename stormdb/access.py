@@ -28,7 +28,7 @@ class DBError(Exception):
         return repr(self.value)
 
 
-class Query():
+class Query(object):
     """ Query object for communicating with the STORM database
 
     Parameters
@@ -49,9 +49,19 @@ class Query():
         Name of project
     """
 
-    def __init__(self, proj_name, stormdblogin='~/.stormdblogin',
+    def __init__(self, proj_name=None, stormdblogin='~/.stormdblogin',
                  verbose=None):
-        self.proj_name = proj_name
+        if proj_name is None:
+            try:
+                proj_name = os.environ['MINDLABPROJ']
+                if proj_name is 'NA':
+                    raise KeyError('Force a KeyError')
+            except KeyError:
+                msg = ('You must specify a project name either when creating '
+                       'a Query-object, or by setting the MINDLABPROJ '
+                       'environment variable (e.g. in your .bashrc file).')
+                raise RuntimeError(msg)
+        self.proj_name = proj_name  # will be checked later!
         self._stormdblogin = stormdblogin
 
         default_server = 'http://hyades00.pet.auh.dk/modules/StormDb/extract/'
@@ -421,6 +431,8 @@ class Query():
 
         return(info_dict_list)
 
+    # def generate_output_path(self, relative_path=None):
+    #     full_path = opj(self._scratch, relative_path)
 
 if __name__ == '__main__':
 

@@ -1,6 +1,6 @@
 """
 =========================
-Methods to process data in StormDB layout, including submission to cluster.
+Classes to process data on hyades cluster
 
 Credits:
     Several functions are modified versions from those in mne-python
@@ -170,7 +170,12 @@ class Maxfilter(ClusterBatch):
         if not check_source_readable(in_fname):
             raise IOError('Input file {0} not readable!'.format(in_fname))
         if not check_destination_writable(out_fname):
-            raise IOError('Output file {0} not writable!'.format(out_fname))
+            if check_source_readable(out_fname) and not force:
+                raise IOError('Output file {0} exists, use force=True to '
+                              'overwrite!'.format(out_fname))
+            else:
+                raise IOError('Output file {0} not '
+                              'writable!'.format(out_fname))
 
         # determine the head origin if necessary
         if origin is None:
