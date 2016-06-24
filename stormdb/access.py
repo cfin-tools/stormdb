@@ -337,7 +337,7 @@ class Query(object):
 
         return(file_list)
 
-    def filter_series(self, description, subjects=[], modalities='MEG',
+    def filter_series(self, description, subjects=[], modalities=[],
                       study_metas='', return_files=True):
         """Select series based on their description (name)
 
