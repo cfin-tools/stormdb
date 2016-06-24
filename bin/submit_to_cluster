@@ -22,7 +22,7 @@ args = parser.parse_args()
 if args.project is None:
     try:
         proj_name = environ['MINDLABPROJ']
-        if proj_name is 'NA':
+        if proj_name == 'NA':
             raise KeyError('Force an error')
     except KeyError:
         msg = ('You must specify a project name either by means of the '

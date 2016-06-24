@@ -54,13 +54,13 @@ class Query(object):
         if proj_name is None:
             try:
                 proj_name = os.environ['MINDLABPROJ']
-                if proj_name is 'NA':
+                if proj_name == 'NA':
                     raise KeyError('Force a KeyError')
             except KeyError:
                 msg = ('You must specify a project name either when creating '
                        'a Query-object, or by setting the MINDLABPROJ '
                        'environment variable (e.g. in your .bashrc file).')
-                raise RuntimeError(msg)
+                raise DBError(msg)
         self.proj_name = proj_name  # will be checked later!
         self._stormdblogin = stormdblogin
 
