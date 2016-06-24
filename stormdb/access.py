@@ -54,7 +54,7 @@ class Query(object):
         if proj_name is None:
             try:
                 proj_name = os.environ['MINDLABPROJ']
-                if proj_name == 'NA':
+                if proj_name == 'NA' or proj_name == '':
                     raise KeyError('Force a KeyError')
             except KeyError:
                 msg = ('You must specify a project name either when creating '
@@ -136,8 +136,8 @@ class Query(object):
                 os.remove(os.path.expanduser(self._stormdblogin))
                 self._get_login_code()
             elif response.find('The project does not exist') != -1:
-                msg = 'The project ID/code you used does not exist ' + \
-                      'in the database, please check.'
+                msg = ('The project ID/code you used ({0}) does not exist '
+                       'in the database, please check.'.format(self.proj_name))
 
             raise DBError(msg)
 
