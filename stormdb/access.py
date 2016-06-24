@@ -400,7 +400,7 @@ class Query(object):
 
         if isinstance(modalities, list):
             try:
-                subjects = '|'.join(modalities)
+                modalities = '|'.join(modalities)
             except TypeError:
                 raise DBError('When using a list of modalities, each element '
                               'must be a string.')
