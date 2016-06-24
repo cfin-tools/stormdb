@@ -424,7 +424,7 @@ class Query(object):
             outp += 'outputoptions[inclfiles]=1&'
 
         url = 'filteredseries?' + self._login_code + '&projectCode=' + \
-              self.proj_name + '&subjects=' + subj_ids + '&studies=' + \
+              self.proj_name + '&subjects=' + subjects + '&studies=' + \
               studies + '&modalities=' + modalities + \
               '&types=' + types + '&anyWithType=' + anywithtype + \
               '&description=' + description + '&excluded=' + excluded +\
