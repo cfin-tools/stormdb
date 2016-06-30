@@ -167,16 +167,6 @@ class Maxfilter(ClusterBatch):
         mx_args : str
             Additional command line arguments to pass to MaxFilter
         """
-        if not check_source_readable(in_fname):
-            raise IOError('Input file {0} not readable!'.format(in_fname))
-        if not check_destination_writable(out_fname):
-            if check_source_readable(out_fname) and not force:
-                raise IOError('Output file {0} exists, use force=True to '
-                              'overwrite!'.format(out_fname))
-            else:
-                raise IOError('Output file {0} not '
-                              'writable!'.format(out_fname))
-
         # determine the head origin if necessary
         if origin is None:
             self.logger.info('Estimating head origin from headshape points..')
@@ -282,6 +272,25 @@ class Maxfilter(ClusterBatch):
 
         self.add_job(cmd, queue='isis.q', n_threads=n_threads)
         self.info['io_mapping'] += [dict(input=in_fname, output=out_fname)]
+
+    def print_input_output_mapping(self):
+        for io in self.info['io_mapping']:
+            print(io['input'])
+            print('\t--> {0}'.format(io['output']))
+
+    def check_input_output_mapping(self, force=False):
+        for io in self.info['io_mapping']:
+            if not check_source_readable(io['input']):
+                raise IOError('Input file {0} not '
+                              'readable!'.format(io['input']))
+            if not check_destination_writable(io['output']):
+                if check_source_readable(io['output']) and not force:
+                    raise IOError('Output file {0} exists, use force=True to '
+                                  'overwrite!'.format(io['output']))
+                else:
+                    raise IOError('Output file {0} not '
+                                  'writable!'.format(io['output']))
+
 
 
 def Xscan(Maxfilter):
