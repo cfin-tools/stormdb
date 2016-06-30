@@ -292,7 +292,6 @@ class Maxfilter(ClusterBatch):
                                   'writable!'.format(io['output']))
 
 
-
 def Xscan(Maxfilter):
     """Elekta xscan: SSS-based bad channel detection.
     """
