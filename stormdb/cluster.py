@@ -1,6 +1,6 @@
 """
 =========================
-Methods to process data in StormDB layout on Hyades cluster
+Classes to process data in StormDB layout on Hyades cluster
 =========================
 
 """
@@ -10,8 +10,6 @@ Methods to process data in StormDB layout on Hyades cluster
 import os
 import sys
 import logging
-# import warnings
-# import numpy as np
 import subprocess as subp
 import re
 from six import string_types
@@ -35,7 +33,7 @@ QSUB_SCHEMA = """
 export OMP_NUM_THREADS=$NSLOTS
 
 echo "Executing following command on $NSLOTS threads:"
-# echo {exec_cmd:s}  # echo not safe with quotes and pipes!
+echo "{exec_cmd:s}"
 
 {exec_cmd:s}  # remember to escape quotes on command-liners!
 
@@ -44,23 +42,58 @@ echo "Done executing"
 
 
 class Cluster(object):
+    """Class to represent the cluster itself, with diagnostic methods.
+
+    Parameters
+    ----------
+    name : str
+        Name of the cluster (default: hyades)
+
+    Attributes
+    ----------
+    queues : list
+        List of queue names defined on cluster.
+    parallel_envs : list
+        List of parallel environment names names defined on cluster.
+    """
     def __init__(self, name='hyades'):
         self.name = name
 
+    def _query(self, cmd):
+        try:
+            output = subp.check_output([cmd],
+                                       stderr=subp.STDOUT, shell=True)
+        except subp.CalledProcessError as cpe:
+            raise RuntimeError('Command {:s} failed with error code {:d}, '
+                               'output is:\n\n{:s}'.format(cmd,
+                                                           cpe.returncode,
+                                                           cpe.output))
+        output = output.rstrip()
+        return(output.split('\n'))
+
     @property
-    def nodes(self):
-        queue_list = self.get_load()
-        return([q['name'] for q in queue_list])
+    def queues(self):
+        return(self._query('qconf -sql'))
 
-    def get_load(self):
+    @property
+    def parallel_envs(self):
+        return(self._query('qconf -spl'))
+
+    def _check_parallel_env(self, queue, pe_name):
+        """Check that a PE is in the pe_list for a given queue"""
+        pes = self._query('qconf -sq ' + queue +
+                          '| grep pe_list')
+        pe_list = pes.split()[1:]
+        if pe_name not in pe_list:
+            raise ValueError('Queue {0} does not support the {1} '
+                             'parallel environment.'.format(queue, pe_name))
+
+    def get_load_dict(self):
         '''Return list of queue load dictionaries'''
-
-        output = subp.check_output(['qstat -g c'],
-                                   stderr=subp.STDOUT, shell=True)
-
-        queues = output.split('\n')[2:-1]  # throw away header lines and \n
+        # throw away header lines and \n
+        loads = self._query('qstat -g c')[2:-1]
         q_list = []
-        for q in queues:
+        for q in loads:
             qq = q.split()
             q_list += [dict(name=qq[0], load=qq[1], used=qq[2], avail=qq[4],
                             total=qq[5])]
@@ -68,7 +101,34 @@ class Cluster(object):
 
 
 class ClusterJob(object):
-    ''''''
+    """Class to represent a single job on the cluster.
+
+    Parameters
+    ----------
+    cmd : str | list of str
+        The shell commands to submit to the cluster as a single job.
+    proj_name : str
+        The StormDB project name (compulsory).
+    queue : str
+        The name of the queue to submit the job to (default: 'short.q').
+    n_threads : int
+        If > 1 (default), the job must be submitted to a queue that is capapble
+        of multi-threaded parallelism.
+
+    Attributes
+    ----------
+    cluster : instance of Cluster
+        Cluster object for status checking etc.
+    proj_name : str
+        The StormDB project name.
+    queue : str
+        The name of the queue the job will be submitted to.
+    n_threads : int
+        Number of threads to run on.
+    cmd : str
+        The command (if several, separated by ';') to be submitted (cannot
+        be modified once defined).
+    """
     def __init__(self, cmd=None, proj_name=None, queue='short.q', n_threads=1,
                  cwd=True, job_name=None, cleanup=True):
         self.cluster = Cluster()
@@ -80,13 +140,14 @@ class ClusterJob(object):
         Query(proj_name)._check_proj_name()  # let fail if bad proj_name
         self.proj_name = proj_name
 
-        if queue not in self.cluster.nodes:
+        if queue not in self.cluster.queues:
             raise ValueError('Unknown queue ({0})!'.format(queue))
         self.queue = queue
+        self.n_threads = n_threads
 
         self._qsub_schema = QSUB_SCHEMA
-        self.qsub_script = None
-        self._cmd = cmd
+        self._qsub_script = None
+        self._initialise_cmd(cmd)  # let the initialiser do the checking
         self._jobid = None
         self._running = False
         self._waiting = False
@@ -97,11 +158,9 @@ class ClusterJob(object):
 
         opt_threaded_flag = ""
         cwd_flag = ''
-        if n_threads > 1:
-            opt_threaded_flag = "#$ -pe threaded {:d}".format(n_threads)
-            if not queue == 'isis.q':
-                raise ValueError('Make sure you use a parallel queue when '
-                                 'submitting jobs with multiple threads.')
+        if self.n_threads > 1:
+            self.cluster.check_parallel_env(self.queue, 'threaded')
+            opt_threaded_flag = "#$ -pe threaded {:d}".format(self.n_threads)
         if job_name is None:
             job_name = 'py-wrapper'
         if cwd:
@@ -116,7 +175,16 @@ class ClusterJob(object):
 
     @cmd.setter
     def cmd(self, value):
-        if not isinstance(value, string_types):
+        raise ValueError('Once the command is set, it cannot be changed!')
+
+    def _initialise_cmd(self, value):
+        if isinstance(value, list):
+            if not all(isinstance(s, string_types) for s in value):
+                raise RuntimeError('Each element of the command list should '
+                                   'be a single string.')
+            else:
+                self._cmd = ';'.join(value)
+        elif not isinstance(value, string_types):
             raise RuntimeError('Command should be a single string.')
         else:
             self._cmd = value
@@ -127,7 +195,7 @@ class ClusterJob(object):
                 cwd_flag is None or opt_threaded_flag is None):
             raise ValueError('This should not happen, please report an Issue!')
 
-        self.qsub_script =\
+        self._qsub_script =\
             self._qsub_schema.format(opt_threaded_flag=opt_threaded_flag,
                                      cwd_flag=cwd_flag, queue=self.queue,
                                      exec_cmd=self.cmd, job_name=job_name)
@@ -161,8 +229,8 @@ class ClusterJob(object):
                 return
 
         if fake:
-            print('Following script would be submitted (if not fake)')
-            print(self.qsub_script)
+            print('Following command would be submitted (if not fake)')
+            print(self._cmd)
             return
 
         self._write_qsub_job()
@@ -190,12 +258,10 @@ class ClusterJob(object):
     def _check_status(self):
         if self._completed:
             return
-        output = subp.check_output(['qstat -u ' + os.environ['USER'] +
-                                    ' | grep {0}'.format(self._jobid) +
-                                    ' | awk \'{print $5, $8}\''],
-                                   stderr=subp.STDOUT, shell=True)
+        output = self.cluster._query('qstat -u ' + os.environ['USER'] +
+                                     ' | grep {0}'.format(self._jobid) +
+                                     ' | awk \'{print $5, $8}\'')[0]  # ONLY
 
-        output = output.rstrip()
         if len(output) == 0:
             if (self._submitted and not self._running and
                     not self._completed and not self._waiting):
@@ -321,15 +387,3 @@ class ClusterBatch(object):
                 job.submit(fake=fake)
             else:
                 raise ValueError('This should never happen, report an Issue!')
-# class Maxfilter(ClusterJob):
-#     def __init__(self, proj_name):
-#         super(Maxfilter, self).__init__(proj_name)
-#     def build_cmd(self, infile, outfile):
-#         self.cmdlist += ['maxfilter {:s} {:s}'.format(infile, outfile)]
-#
-# class Freesurfer(ClusterJob):
-#     def __init__(self, proj_name):
-#         super(Freesurfer, self).__init__(proj_name)
-#     def build_cmd(self, subject, series):
-#         self.cmdlist += ["recon-all -all -subjid %s -i %s" % (
-#                     subject, series[0]["path"] + "/" + series[0]["files"][0])]
