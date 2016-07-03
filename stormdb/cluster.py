@@ -85,7 +85,7 @@ class Cluster(object):
                           '| grep pe_list')
         pe_list = pes.split()[1:]
         if pe_name not in pe_list:
-            raise ValueError('Queue {0} does not support the {1} '
+            raise ValueError('Queue \'{0}\' does not support the \'{1}\' '
                              'parallel environment.'.format(queue, pe_name))
 
     def get_load_dict(self):
