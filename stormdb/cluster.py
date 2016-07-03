@@ -82,7 +82,7 @@ class Cluster(object):
     def _check_parallel_env(self, queue, pe_name):
         """Check that a PE is in the pe_list for a given queue"""
         pes = self._query('qconf -sq ' + queue +
-                          '| grep pe_list')
+                          '| grep pe_list')[0]  # just one line
         pe_list = pes.split()[1:]
         if pe_name not in pe_list:
             raise ValueError('Queue \'{0}\' does not support the \'{1}\' '
