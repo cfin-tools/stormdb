@@ -159,7 +159,7 @@ class ClusterJob(object):
         opt_threaded_flag = ""
         cwd_flag = ''
         if self.n_threads > 1:
-            self.cluster.check_parallel_env(self.queue, 'threaded')
+            self.cluster._check_parallel_env(self.queue, 'threaded')
             opt_threaded_flag = "#$ -pe threaded {:d}".format(self.n_threads)
         if job_name is None:
             job_name = 'py-wrapper'
