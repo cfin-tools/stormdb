@@ -5,7 +5,7 @@ stormdb-python
 
 The `stormdb-python` package provides methods to access the StormDB database,
 as well as for submitting jobs to be processed on the hyades-cluster.
-(:ref:`You can: <what_can_you_do>`):
+:ref:`You can <what_can_you_do>`:
 
 1. Query the database for a list of series (DICOM sets if MR, raw files if MEG) that match a given string.
 2. Submit one or several `maxfilter`-runs to the cluster.
