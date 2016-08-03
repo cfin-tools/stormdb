@@ -21,14 +21,4 @@ for sub in subjects:
 Submodule: process
 -----------------
 
-NEEDS UPDATING
-
-Currently houses the `Maxfilter`-object, which can be used to prepare maxfiltering runs and finally to submit them to the cluster for processing.
-
-```
-from stormdb.process import Maxfilter
-mf = Maxfilter('MINDLAB20XX_MEG-YourProject')
-mf.build_maxfilter_cmd(in_fname, out_fname)
-mf.submit_to_isis(n_jobs=4)
-# See helps for both methods for more details
-```
+NEEDS UPDATING, see also `doc`-folder
