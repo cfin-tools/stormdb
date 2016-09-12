@@ -114,6 +114,14 @@ class ClusterJob(object):
     n_threads : int
         If > 1 (default), the job must be submitted to a queue that is capapble
         of multi-threaded parallelism.
+    cwd : bool
+        Set the job's working directory to the one the job is initiated from
+        (default: True).
+    job_name : str | None
+        Name of job (shows up in the output of qstat). If None, "py-wrapper"
+        is used.
+    cleanup : bool
+        Delete qsub bash-script after submission (default: True)
 
     Attributes
     ----------

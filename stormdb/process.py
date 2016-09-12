@@ -57,7 +57,7 @@ class MNEPython(ClusterBatch):
                              l_freq=l_freq, h_freq=h_freq, kwargs=filtargs)
         cmd += "\""
 
-        self.add_job(cmd, n_threads=1)
+        self.add_job(cmd, n_threads=1, job_name='mne.raw.filter')
         self.info['io_mapping'] += [dict(input=in_fname, output=out_fname)]
 
 
@@ -271,8 +271,9 @@ class Maxfilter(ClusterBatch):
         if logfile:
             cmd += ' | tee ' + logfile
 
-        # NB isis.q hard-coded here, remember to change if cluster changes
-        self.add_job(cmd, queue='isis.q', n_threads=n_threads)
+        # NB maxfilter.q hard-coded here, remember to change if cluster changes
+        self.add_job(cmd, queue='maxfilter.q', n_threads=n_threads,
+                     job_name='maxfilter')
         self.info['io_mapping'] += [dict(input=in_fname, output=out_fname)]
 
     def print_input_output_mapping(self):
@@ -358,46 +359,6 @@ def Xscan(Maxfilter):
     #         uniq_bads = [b for b in new_bads if b not in self.bad]
     #         self.info['bad'] = uniq_bads
     #         self.logger.info('Maxfilter object bad channel list updated')
-
-
-#     def submit_to_cluster(self, n_jobs=1, fake=False):
-#         """ Submit the command built earlier for processing on the cluster.
-#
-#         Things to implement
-#         * check output?
-#
-#         Parameters
-#         ----------
-#         n_jobs : int
-#             Number of parallel threads to allow (Intel MKL). Max 12!
-#         fake : bool
-#             If true, run a fake run, just print the command that will be
-#             submitted.
-#         """
-#         if len(self.info['cmd']) < 1:
-#             raise NameError('cmd to submit is not defined yet')
-#
-#         for ic, cmd in enumerate(self.info['cmd']):
-#             if not fake:
-#                 self.logger.info('Submitting command:\n{:s}'.format(cmd))
-#
-#                 submit_to_cluster(cmd, n_jobs=n_jobs, queue='isis.q',
-#                                   job_name='maxfilter')
-#
-#                 self.info['cmd'] = []  # clear list for next round
-#                 self.info['io_mapping'] = []  # clear list for next round
-#             else:
-#                 print('{:d}: {:s}'.format(ic + 1,
-#                                           self.info['io_mapping'][ic]['input']))
-#                 print('\t-->{:s}'.format(self.info['io_mapping'][ic]['output']))
-#
-#
-# def _check_n_jobs(n_jobs):
-#     """Check that n_jobs is sane"""
-#     if n_jobs > 12:
-#         raise ValueError('isis only has 12 cores!')
-#     elif n_jobs < 1 or type(n_jobs) is not int:
-#         raise ValueError('number of jobs must be a positive integer!')
 
 
 def check_destination_writable(dest):
