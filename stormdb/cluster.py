@@ -29,6 +29,7 @@ QSUB_SCHEMA = """
 #$ -j y
 #$ -q {queue:s}
 {opt_threaded_flag:s}
+{opt_h_vmem_flag:s}
 
 # Make sure process uses max requested number of threads!
 export OMP_NUM_THREADS=$NSLOTS
@@ -112,6 +113,10 @@ class ClusterJob(object):
         The StormDB project name (compulsory).
     queue : str
         The name of the queue to submit the job to (default: 'short.q').
+    h_vmem : str | None
+        Specify the limit on the amount of combined memory consumed by all
+        the processes in the job. This parameter only has an effect for queues
+        that support setting the parameter. The format is in the style "50G".
     n_threads : int
         If > 1 (default), the job must be submitted to a queue that is capapble
         of multi-threaded parallelism.
@@ -138,8 +143,8 @@ class ClusterJob(object):
         The command (if several, separated by ';') to be submitted (cannot
         be modified once defined).
     """
-    def __init__(self, cmd=None, proj_name=None, queue='short.q', n_threads=1,
-                 cwd=True, job_name=None, cleanup=True):
+    def __init__(self, cmd=None, proj_name=None, queue='short.q', h_vmem=None,
+                 n_threads=1, cwd=True, job_name=None, cleanup=True):
         self.cluster = Cluster()
 
         if not cmd:
@@ -153,6 +158,7 @@ class ClusterJob(object):
             raise ValueError('Unknown queue ({0})!'.format(queue))
         self.queue = queue
         self.n_threads = n_threads
+        self.h_vmem = h_vmem
 
         self._qsub_schema = QSUB_SCHEMA
         self._qsub_script = None
@@ -166,10 +172,14 @@ class ClusterJob(object):
         self._cleanup_qsub_job = cleanup
 
         opt_threaded_flag = ""
+        opt_h_vmem_flag = ""
         cwd_flag = ''
         if self.n_threads > 1:
             self.cluster._check_parallel_env(self.queue, 'threaded')
             opt_threaded_flag = "#$ -pe threaded {:d}".format(self.n_threads)
+        if self.h_vmem is not None:
+            # XXX would be nice with some sanity checking here...
+            opt_h_vmem_flag = "#$ -l h_vmem={:s}".format(self.h_vmem)
         if job_name is None:
             job_name = 'py-wrapper'
         if cwd:

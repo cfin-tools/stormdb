@@ -10,6 +10,9 @@ parser.add_argument('-n', '--n_threads', type=int,
                     default=1, help='Number of threads to run per process')
 parser.add_argument('-q', '--queue', type=str, default='short.q',
                     help='Name of queue to submit to')
+parser.add_argument('--h_vmem', type=str, default=None,
+                    help=('Amount of virtual memory to request. Example '
+                          'format: 50G'))
 parser.add_argument('-p', '--project', type=str, default=None,
                     help='Name of project (or set MINDLABPROJ)')
 parser.add_argument('--noclean', action='store_false',
