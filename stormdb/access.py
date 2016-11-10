@@ -129,7 +129,8 @@ class Query(object):
 
     def _check_response(self, response, error_str='error'):
         if response.find(error_str) != -1:
-            if response.find('Your login is not working') != -1:
+            if (response.find('Your login is not working') != -1 or
+                    response.find('Could not login') != -1):
                 msg = 'Looks like your ~/.stormdblogin is old/broken ' +\
                       'and will be removed. Please enter your credentials' +\
                       'and re-run your query.'
@@ -139,7 +140,9 @@ class Query(object):
             elif response.find('The project does not exist') != -1:
                 msg = ('The project ID/code you used ({0}) does not exist '
                        'in the database, please check.'.format(self.proj_name))
-
+            else:
+                msg = ('StormDB reports error "{0}", not sure what to do '
+                       'about it.'.format(response))
             raise DBError(msg)
 
         return(0)
