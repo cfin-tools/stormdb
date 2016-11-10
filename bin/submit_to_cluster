@@ -36,5 +36,5 @@ else:
     proj_name = args.project
 
 job = ClusterJob(args.exec_cmd, proj_name=proj_name, n_threads=args.n_threads,
-                 cleanup=args.noclean, queue=args.queue)
+                 cleanup=args.noclean, queue=args.queue, h_vmem=args.h_vmem)
 job.submit()

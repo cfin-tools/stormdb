@@ -186,7 +186,7 @@ class ClusterJob(object):
             cwd_flag = '#$ -cwd'
 
         self._create_qsub_script(job_name, cwd_flag,
-                                 opt_threaded_flag)
+                                 opt_threaded_flag, opt_h_vmem_flag)
 
     @property
     def cmd(self):
@@ -208,14 +208,17 @@ class ClusterJob(object):
         else:
             self._cmd = value
 
-    def _create_qsub_script(self, job_name, cwd_flag, opt_threaded_flag):
+    def _create_qsub_script(self, job_name, cwd_flag, opt_threaded_flag,
+                            opt_h_vmem_flag):
         """All variables should be defined"""
         if (self.cmd is None or self.queue is None or job_name is None or
-                cwd_flag is None or opt_threaded_flag is None):
+                cwd_flag is None or opt_threaded_flag is None or
+                opt_h_vmem_flag is None):
             raise ValueError('This should not happen, please report an Issue!')
 
         self._qsub_script =\
             self._qsub_schema.format(opt_threaded_flag=opt_threaded_flag,
+                                     opt_h_vmem_flag=opt_h_vmem_flag,
                                      cwd_flag=cwd_flag, queue=self.queue,
                                      exec_cmd=self.cmd, job_name=job_name)
 
