@@ -60,6 +60,7 @@ class Cluster(object):
     """
     def __init__(self, name='hyades'):
         self.name = name
+        self._highmem_qs = ['highmem.q']
 
     def _query(self, cmd):
         try:
@@ -156,6 +157,12 @@ class ClusterJob(object):
 
         if queue not in self.cluster.queues:
             raise ValueError('Unknown queue ({0})!'.format(queue))
+        if queue in self.cluster._highmem_qs and h_vmem is None:
+            raise RuntimeError('You must specify the anticipated memory '
+                               'usage for the {:s} queue using the option: '
+                               'h_vmem'.format(queue))
+        # TODO sanity-check h_vmem-string
+
         self.queue = queue
         self.n_threads = n_threads
         self.h_vmem = h_vmem
