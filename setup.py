@@ -28,6 +28,7 @@ setup(
     keywords = "code",
     url = "https://github.com/cfin-tools/stormdb.git",
     packages=['stormdb'],
+    scripts=['bin/submit_to_cluster'],
     long_description=read('README.md'),
     classifiers=[
         "Development Status :: 3 - Alpha",

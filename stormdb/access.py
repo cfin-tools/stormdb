@@ -13,9 +13,10 @@ from getpass import getuser, getpass
 import os
 import requests
 from requests import ConnectionError
-import urllib
 import re
 from six import string_types
+from six.moves.urllib.parse import quote_plus
+from io import open
 
 
 class DBError(Exception):
@@ -115,15 +116,16 @@ class Query(object):
             pwd = getpass(prompt)
 
             url = 'login/username/' + usr + \
-                  '/password/' + urllib.quote_plus(pwd)
+                  '/password/' + quote_plus(pwd)
             output = self._send_request(url, verbose=False)  # never echo pw
 
             # If we get this far, no DBError was issued above
             print("Code generated, writing to {:s}".format(self._stormdblogin))
             self._login_code = output
 
-            with open(os.path.expanduser(self._stormdblogin), 'w') as fout:
-                fout.write(self._login_code.encode('UTF-8'))
+            with open(os.path.expanduser(self._stormdblogin), 'wt') as fout:
+                # fout.write(self._login_code.encode('UTF-8'))
+                fout.write(self._login_code)
             # Use octal representation
             os.chmod(os.path.expanduser(self._stormdblogin), 0o400)
 
