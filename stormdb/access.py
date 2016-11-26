@@ -154,7 +154,8 @@ class Query(object):
 
     def _send_request(self, url):
         full_url = self._server + url
-        print(full_url) if self._verbose
+        if self._verbose:
+            print(full_url)
 
         try:
             req = requests.get(full_url)
@@ -164,7 +165,8 @@ class Query(object):
             raise
 
         response = req.content.decode(encoding='UTF-8')
-        print(response) if self._verbose
+        if self._verbose:
+            print(response)
         self._check_response(response)
 
         # Python 3.x treats pipe strings as bytes, which need to be encoded
