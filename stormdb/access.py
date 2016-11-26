@@ -41,8 +41,8 @@ class Query(object):
         The default '~/.stormdblogin' should be OK for everyone. If the file
         does not exist (e.g., for first-time users), the user will be
         prompted for a username and password.
-    username : str | None
-        Define username for login. If None (default), current user is assumed.
+    verbose : bool
+        If True, print a lot of messages for debugging. Default: None
 
     Attributes
     ----------
@@ -64,6 +64,7 @@ class Query(object):
                 raise DBError(msg)
         self.proj_name = proj_name  # will be checked later!
         self._stormdblogin = stormdblogin
+        self._verbose = verbose
 
         default_server = 'http://hyades00.pet.auh.dk/modules/StormDb/extract/'
         try_alt_server = False
@@ -151,10 +152,9 @@ class Query(object):
         url = '?' + self._login_code + '&projectCode=' + self.proj_name
         self._send_request(url)
 
-    def _send_request(self, url, verbose=False):
+    def _send_request(self, url):
         full_url = self._server + url
-        if verbose:
-            print(full_url)
+        print(full_url) if self._verbose
 
         try:
             req = requests.get(full_url)
@@ -164,6 +164,7 @@ class Query(object):
             raise
 
         response = req.content.decode(encoding='UTF-8')
+        print(response) if self._verbose
         self._check_response(response)
 
         # Python 3.x treats pipe strings as bytes, which need to be encoded
