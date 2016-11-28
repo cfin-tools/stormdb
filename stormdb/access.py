@@ -95,13 +95,13 @@ class Query(object):
             raise DBError('No access to database server (tried: '
                           '{0} and\n{1})'.format(default_server, alt_server))
 
-        self._get_login_code(verbose=verbose)
+        self._get_login_code()
         self._check_proj_name()
 
-    def _get_login_code(self, verbose=False):
+    def _get_login_code(self):
         try:
             with open(os.path.expanduser(self._stormdblogin), 'r') as fid:
-                if verbose:
+                if self._verbose:
                     print('Reading login credentials from ' +
                           self._stormdblogin)
                 self._login_code = fid.readline()
@@ -152,9 +152,19 @@ class Query(object):
         url = '?' + self._login_code + '&projectCode=' + self.proj_name
         self._send_request(url)
 
-    def _send_request(self, url):
+    def _send_request(self, url, verbose=None):
+        # This rather strange logic enables the following. Note that this
+        # method is private, meaning we control the call logic tightly
+        # - the "global" (instance-level) verbosity will be effective unless
+        #   the method is called with an explicit verbosity
+        # - an explicit False will silence a globally True verbosity!
+        if verbose is True or (verbose is None and self._verbose):
+            this_verbose = True
+        else:
+            this_verbose = False
+
         full_url = self._server + url
-        if self._verbose:
+        if this_verbose:
             print(full_url)
 
         try:
@@ -165,7 +175,7 @@ class Query(object):
             raise
 
         response = req.content.decode(encoding='UTF-8')
-        if self._verbose:
+        if this_verbose:
             print(response)
         self._check_response(response)
 
