@@ -145,6 +145,10 @@ class Query(object):
                 msg = ('StormDB reports error "{0}", not sure what to do '
                        'about it.'.format(response))
             raise DBError(msg)
+        elif response.find("<!DOCTYPE html>") == 0:
+            msg = ('Poorly formed HTTP GET string, this should not happen! '
+                   'Contact a member of the server administration.')
+            DBError(msg)
 
         return(0)
 
