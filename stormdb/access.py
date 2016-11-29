@@ -96,7 +96,7 @@ class Query(object):
                           '{0} and\n{1})'.format(default_server, alt_server))
 
         self._get_login_code()
-        self._check_proj_name()
+        self._check_login_credentials()  # checks templogin and proj_name
 
     def _get_login_code(self):
         try:
@@ -148,11 +148,11 @@ class Query(object):
         elif response.find("<!DOCTYPE html>") == 0:
             msg = ('Poorly formed HTTP GET string, this should not happen! '
                    'Contact a member of the server administration.')
-            DBError(msg)
+            raise DBError(msg)
 
-        return(0)
-
-    def _check_proj_name(self, verbose=False):
+    def _check_login_credentials(self):
+        '''Check that a valid stormdblogin and project name are given.
+        '''
         url = '?' + self._login_code + '&projectCode=' + self.proj_name
         self._send_request(url)
 
@@ -181,7 +181,14 @@ class Query(object):
         response = req.content.decode(encoding='UTF-8')
         if this_verbose:
             print(response)
-        self._check_response(response)
+
+        try:
+            self._check_response(response)
+        except DBError as e:
+            print(10 * '*' + ' Last GET string: ' + 10 * '*')
+            print(full_url)
+            print(48 * '*')
+            raise e
 
         # Python 3.x treats pipe strings as bytes, which need to be encoded
         # Here assuming shell output is in UTF-8
