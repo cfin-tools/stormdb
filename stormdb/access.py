@@ -139,9 +139,9 @@ class Query(object):
                 warn(msg)
                 try:
                     os.chmod(os.path.expanduser(self._stormdblogin), 0o600)
+                    os.remove(os.path.expanduser(self._stormdblogin))
                 except OSError:
                     pass  # missing ~/.stormdblogin
-                os.remove(os.path.expanduser(self._stormdblogin))
                 self._get_login_code()
             else:
                 if response.find('The project does not exist') != -1:
