@@ -10,6 +10,7 @@ Methods to interact with the STORM database
 
 
 from getpass import getuser, getpass
+from warnings import warn
 import os
 import requests
 from requests import ConnectionError
@@ -135,16 +136,19 @@ class Query(object):
                 msg = 'Looks like your ~/.stormdblogin is old/broken ' +\
                       'and will be removed. Please enter your credentials' +\
                       'and re-run your query.'
+                warn(msg)
                 os.chmod(os.path.expanduser(self._stormdblogin), 0o600)
                 os.remove(os.path.expanduser(self._stormdblogin))
                 self._get_login_code()
-            elif response.find('The project does not exist') != -1:
-                msg = ('The project ID/code you used ({0}) does not exist '
-                       'in the database, please check.'.format(self.proj_name))
             else:
-                msg = ('StormDB reports error "{0}", not sure what to do '
-                       'about it.'.format(response))
-            raise DBError(msg)
+                if response.find('The project does not exist') != -1:
+                    msg = ('The project ID/code used ({0}) '
+                           'does not exist in the database, please '
+                           'check.'.format(self.proj_name))
+                else:
+                    msg = ('StormDB reports error "{0}", not sure what to do '
+                           'about it.'.format(response))
+                raise DBError(msg)
         elif response.find("<!DOCTYPE html>") == 0:
             msg = ('Poorly formed HTTP GET string, this should not happen! '
                    'Contact a member of the server administration.')
