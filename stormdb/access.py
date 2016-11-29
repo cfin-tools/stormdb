@@ -134,10 +134,13 @@ class Query(object):
             if (response.find('Your login is not working') != -1 or
                     response.find('Could not login') != -1):
                 msg = 'Looks like your ~/.stormdblogin is old/broken ' +\
-                      'and will be removed. Please enter your credentials' +\
+                      'and will be removed. Please enter your credentials ' +\
                       'and re-run your query.'
                 warn(msg)
-                os.chmod(os.path.expanduser(self._stormdblogin), 0o600)
+                try:
+                    os.chmod(os.path.expanduser(self._stormdblogin), 0o600)
+                except OSError:
+                    pass  # missing ~/.stormdblogin
                 os.remove(os.path.expanduser(self._stormdblogin))
                 self._get_login_code()
             else:
@@ -157,7 +160,8 @@ class Query(object):
     def _check_login_credentials(self):
         '''Check that a valid stormdblogin and project name are given.
         '''
-        url = '?' + self._login_code + '&projectCode=' + self.proj_name
+        url = ('testlogin?{login:s}&projectCode={proj:s}'
+               ''.format(login=self._login_code, proj=self.proj_name))
         self._send_request(url)
 
     def _send_request(self, url, verbose=None):
@@ -189,9 +193,10 @@ class Query(object):
         try:
             self._check_response(response)
         except DBError as e:
-            print(10 * '*' + ' Last GET string: ' + 10 * '*')
-            print(full_url)
-            print(48 * '*')
+            if this_verbose:
+                print(10 * '*' + ' Last GET string: ' + 10 * '*')
+                print(full_url)
+                print(38 * '*')
             raise e
 
         # Python 3.x treats pipe strings as bytes, which need to be encoded
