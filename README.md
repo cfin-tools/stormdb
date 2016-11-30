@@ -1,7 +1,8 @@
 stormdb-python
 ==============
 
-Python classes for interacting with the STORM database at CFIN.
+* Python classes for interacting with the STORM database at CFIN.
+* A command-line utility (`submit_to_cluster`) for submitting commands for processing on the Hyades-cluster.
 
 __NB! Help with documentation and examples needed!__
 
