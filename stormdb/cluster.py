@@ -152,7 +152,7 @@ class ClusterJob(object):
             raise(ValueError('You must specify the command to run!'))
         if not proj_name:
             raise(ValueError('Jobs are associated with a specific project.'))
-        Query(proj_name)._check_proj_name()  # let fail if bad proj_name
+        Query(proj_name)._check_login_credentials()
         self.proj_name = proj_name
 
         if queue not in self.cluster.queues:
@@ -161,7 +161,6 @@ class ClusterJob(object):
             raise RuntimeError('You must specify the anticipated memory '
                                'usage for the {:s} queue using the option: '
                                'h_vmem'.format(queue))
-        # TODO sanity-check h_vmem-string
 
         self.queue = queue
         self.n_threads = n_threads
