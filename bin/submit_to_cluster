@@ -37,7 +37,7 @@ else:
 # basic check of the memory-argument
 if args.h_vmem is not None:
     if (not args.h_vmem.startswith(tuple('%d' % ii for ii in range(1, 10))) or
-            not args.h_vmem.tolower().endswith(('M', 'G'))):
+            not args.h_vmem.upper().endswith(('M', 'G'))):
         raise ValueError('Bad memory format: {:s}'.format(args.h_vmem))
 
 job = ClusterJob(args.exec_cmd, proj_name=proj_name, n_threads=args.n_threads,
