@@ -131,20 +131,24 @@ class Query(object):
 
     def _check_response(self, response, error_str='error'):
         if response.find(error_str) != -1:
-            if (response.find('Your login is not working') != -1 or
-                    response.find('Could not login') != -1):
+            if response.find('Your login is not working') != -1:
+                # Bad templogin-hash
                 msg = 'Looks like your ~/.stormdblogin is old/broken ' +\
                       'and will be removed. Please enter your credentials ' +\
                       'and re-run your query.'
                 warn(msg)
                 try:
                     os.chmod(os.path.expanduser(self._stormdblogin), 0o600)
-                    os.remove(os.path.expanduser(self._stormdblogin))
-                except OSError:
+                except OSError:  # file doesn't exist
                     pass  # missing ~/.stormdblogin
+                else:
+                    os.remove(os.path.expanduser(self._stormdblogin))
                 self._get_login_code()
+
             else:
-                if response.find('The project does not exist') != -1:
+                if response.find('Could not login') != -1:
+                    msg = ('Invalid username or wrong password!')
+                elif response.find('The project does not exist') != -1:
                     msg = ('The project ID/code used ({0}) '
                            'does not exist in the database, please '
                            'check.'.format(self.proj_name))
