@@ -345,7 +345,8 @@ class ClusterBatch(object):
     """
     def __init__(self, proj_name, verbose=False):
         self.cluster = Cluster()
-        Query(proj_name)._check_proj_name()  # let fail if bad proj_name
+        # let fail if bad proj_name
+        Query(proj_name)._check_login_credentials()
         self.proj_name = proj_name
         self._joblist = []
 
