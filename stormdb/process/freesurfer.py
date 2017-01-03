@@ -8,6 +8,7 @@ Classes related to Freesurfer
 #
 # License: BSD (3-clause)
 import os
+from six import string_types
 
 from .base import (enforce_path_exists, check_source_readable, parse_arguments)
 from ..access import Query
@@ -136,6 +137,10 @@ class Freesurfer(ClusterBatch):
         for sub in subjects:
             cmd = 'self.' + method + '({0}'.format(sub)
             for k, v in kwargs.iteritems():
-                cmd += ', {0}={1}'.format(k, v)
+                if isinstance(v, string_types):
+                    cmd += ", {0}='{1}''".format(k, v)
+                else:
+                    cmd += ', {0}={1}'.format(k, v)
+
             cmd += ')'
             eval(cmd)
