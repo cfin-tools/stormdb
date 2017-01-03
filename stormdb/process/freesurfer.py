@@ -9,7 +9,7 @@ Classes related to Freesurfer
 # License: BSD (3-clause)
 import os
 
-from .base import (enforce_path_exists, check_source_readable)
+from .base import (enforce_path_exists, check_source_readable, parse_arguments)
 from ..access import Query
 from ..cluster import ClusterBatch
 
@@ -44,7 +44,7 @@ class Freesurfer(ClusterBatch):
                  verbose=True):
         super(Freesurfer, self).__init__(proj_name)
 
-        self.info = dict()
+        self.info = dict(valid_subjects=Query(proj_name).get_subjects())
 
         if subjects_dir is None:
             if 'SUBJECTS_DIR' in os.environ.keys():
@@ -69,7 +69,6 @@ class Freesurfer(ClusterBatch):
     def recon_all(self, subject, t1_series=None, hemi='both',
                   process_flag='all', queue='long.q', n_threads=1,
                   recon_bin='/usr/local/freesurfer/bin/recon-all'):
-
         """Build a Freesurfer command for later execution.
 
         Parameters
@@ -78,8 +77,7 @@ class Freesurfer(ClusterBatch):
             Input file name
         """
 
-        qy = Query(self.proj_name)
-        if subject not in qy.get_subjects():
+        if subject not in self.info['valid_subjects']:
             raise RuntimeError(
                 'Subject {0} not found in database!'.format(subject))
         cur_subj_dir = os.path.join(self.info['subjects_dir'], subject)
@@ -103,9 +101,9 @@ class Freesurfer(ClusterBatch):
                 else:
                     t1_series = self.info['t1_series']
 
-            series = qy.filter_series(description=t1_series,
-                                      subjects=subject,
-                                      modalities="MR")
+            series = Query(self.proj_name).filter_series(description=t1_series,
+                                                         subjects=subject,
+                                                         modalities="MR")
             if len(series) == 0:
                 raise RuntimeError('No series found matching {0} for subject '
                                    '{1}'.format(t1_series, subject))
@@ -119,3 +117,23 @@ class Freesurfer(ClusterBatch):
 
         self.add_job(cmd, queue=queue, n_threads=n_threads,
                      job_name='recon-all')
+
+    def prepare_subjects(self, subjects=None, method='recon_all'):
+        """Apply a Freesufer-method to a list of subjects.
+
+        Parameters
+        ----------
+        subjects : list of str | None
+            List of subjects to loop over. If None, all included subjects are
+            selected from the database.
+        method : str
+            Name of Freesurfer-method to apply. Default: 'recon_all'
+        """
+        if subjects is None:
+            subjects = self.info['valid_subjects']
+        args, kwargs = parse_arguments(eval('self.' + method))
+
+        for sub in subjects:
+            cmd = ('self.' + method + '({0}, '.format(sub) +
+                   '{0})'.format(**kwargs))
+            eval(cmd)
