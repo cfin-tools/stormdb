@@ -1,6 +1,6 @@
 """
 =========================
-Classes to process data on hyades cluster
+Classes related to Maxfilter
 
 Credits:
     Several functions are modified versions from those in mne-python
@@ -11,54 +11,14 @@ Credits:
 # Author: Chris Bailey <cjb@cfin.au.dk>
 #
 # License: BSD (3-clause)
-import os
 import warnings
-import inspect
 import numpy as np
 
 from mne.io import Raw
 from mne.bem import fit_sphere_to_headshape
 
-from .cluster import ClusterBatch
-
-
-class MNEPython(ClusterBatch):
-    """ Foo
-    """
-    def __init__(self, proj_name, bad=[], verbose=True):
-        super(MNEPython, self).__init__(proj_name)
-
-        self.info = dict(bad=bad, io_mapping=[])
-
-    def parse_arguments(self, func):
-        # argspec = inspect.getargspec(Raw.filter)
-        argspec = inspect.getargspec(func)
-        n_pos = len(argspec.args) - len(argspec.defaults)
-        args = argspec.args[1:n_pos]  # drop self
-        kwargs = {key: val for key, val in zip(argspec.args[n_pos:],
-                                               argspec.defaults)}
-        return(args, kwargs)
-
-    def raw_filter(self, in_fname, out_fname, l_freq, h_freq, **kwargs):
-        if not check_source_readable(in_fname):
-            raise IOError('Input file {0} not readable!'.format(in_fname))
-        if not check_destination_writable(out_fname):
-            raise IOError('Output file {0} not writable!'.format(out_fname))
-
-        script = ("from mne.io import read_raw_fif;"
-                  "raw = read_raw_fif('{in_fname:s}', preload=True);"
-                  "raw.filter({l_freq}, {h_freq}{kwargs:});"
-                  "raw.save('{out_fname:s}')")
-        filtargs = ', '.join("{!s}={!r}".format(key, val) for
-                             (key, val) in kwargs.items())
-        filtargs = ', ' + filtargs if len(kwargs) > 0 else filtargs
-        cmd = "python -c \""
-        cmd += script.format(in_fname=in_fname, out_fname=out_fname,
-                             l_freq=l_freq, h_freq=h_freq, kwargs=filtargs)
-        cmd += "\""
-
-        self.add_job(cmd, n_threads=1, job_name='mne.raw.filter')
-        self.info['io_mapping'] += [dict(input=in_fname, output=out_fname)]
+from .base import check_destination_writable, check_source_readable
+from ..cluster import ClusterBatch
 
 
 class Maxfilter(ClusterBatch):
@@ -360,23 +320,3 @@ def Xscan(Maxfilter):
     #         uniq_bads = [b for b in new_bads if b not in self.bad]
     #         self.info['bad'] = uniq_bads
     #         self.logger.info('Maxfilter object bad channel list updated')
-
-
-def check_destination_writable(dest):
-    try:
-        open(dest, 'w')
-    except IOError:
-        return False
-    else:
-        os.remove(dest)
-        return True
-
-
-def check_source_readable(source):
-    try:
-        fid = open(source, 'r')
-    except IOError:
-        return False
-    else:
-        fid.close()
-        return True

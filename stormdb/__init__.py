@@ -1,7 +1,5 @@
 """
-STORM database access
+STORM database access and cluster processing tools.
 """
 
-__VERSION__= '0.3git'
-
-#import .access
+__VERSION__ = '0.5'

@@ -20,13 +20,13 @@ class CleanCommand(Command):
 
 setup(
     name = "stormdb",
-    version = "0.4b",
+    version = "0.5",
     author = "Christopher Bailey",
     author_email = "cjb@cfin.au.dk",
-    description = ("Access to StormDb @ CFIN"),
+    description = ("Tools for accessing StormDb @ CFIN"),
     license = "BSD",
     keywords = "code",
-    url = "https://github.com/cfin-tools/stormdb.git",
+    url = "https://github.com/meeg-cfin/stormdb-python.git",
     packages=['stormdb'],
     scripts=['bin/submit_to_cluster'],
     long_description=read('README.md'),
