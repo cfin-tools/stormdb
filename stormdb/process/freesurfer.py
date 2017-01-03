@@ -119,7 +119,7 @@ class Freesurfer(ClusterBatch):
         self.add_job(cmd, queue=queue, n_threads=n_threads,
                      job_name='recon-all')
 
-    def prepare_subjects(self, subjects=None, method='recon_all'):
+    def apply_to_subjects(self, subjects=None, method='recon_all'):
         """Apply a Freesufer-method to a list of subjects.
 
         Parameters
