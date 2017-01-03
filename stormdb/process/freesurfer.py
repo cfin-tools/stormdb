@@ -106,3 +106,6 @@ class Freesurfer(ClusterBatch):
                                    'matches the pattern {0}'.format(t1_series))
             dicom_path = os.path.join(series[0]['path'], series[0]['files'][0])
             cmd += ' -i {dcm_pth:s}'.format(dcm_pth=dicom_path)
+
+        self.add_job(cmd, queue='long.q', n_threads=n_threads,
+                     job_name='recon-all')
