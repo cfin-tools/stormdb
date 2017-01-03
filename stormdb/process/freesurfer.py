@@ -119,7 +119,8 @@ class Freesurfer(ClusterBatch):
         self.add_job(cmd, queue=queue, n_threads=n_threads,
                      job_name='recon-all')
 
-    def apply_to_subjects(self, subjects=None, method='recon_all'):
+    def apply_to_subjects(self, subjects=None, method='recon_all',
+                          method_args=None):
         """Apply a Freesufer-method to a list of subjects.
 
         Parameters
@@ -129,6 +130,9 @@ class Freesurfer(ClusterBatch):
             selected from the database.
         method : str
             Name of Freesurfer-method to apply. Default: 'recon_all'
+        method_args : dict | None
+            Dictionary of argument value-pairs to pass on to method. If None,
+            default values of the method are used.
         """
         if subjects is None:
             subjects = self.info['valid_subjects']
@@ -137,6 +141,9 @@ class Freesurfer(ClusterBatch):
         for sub in subjects:
             cmd = 'self.' + method + "('{0}'".format(sub)
             for k, v in kwargs.iteritems():
+                if method_args is not None and k in method_args.keys():
+                    v = method_args[k]
+
                 if isinstance(v, string_types):
                     cmd += ", {0}='{1}'".format(k, v)
                 else:
