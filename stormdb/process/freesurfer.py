@@ -138,7 +138,7 @@ class Freesurfer(ClusterBatch):
             cmd = 'self.' + method + "('{0}'".format(sub)
             for k, v in kwargs.iteritems():
                 if isinstance(v, string_types):
-                    cmd += ", {0}='{1}''".format(k, v)
+                    cmd += ", {0}='{1}'".format(k, v)
                 else:
                     cmd += ', {0}={1}'.format(k, v)
 
