@@ -19,8 +19,9 @@ class Freesurfer(ClusterBatch):
 
     Parameters
     ----------
-    proj_name : str
-        The name of the project.
+    proj_name : str | None
+        The name of the project. If None, will read MINDLABPROJ from
+        environment.
     subjects_dir : str | None
         Relative path to the Freesurfer SUBJECTS_DIR
         (e.g. 'scratch/fs_subjects_dir'). If None, we'll first try to read
@@ -39,11 +40,11 @@ class Freesurfer(ClusterBatch):
         If defined, represents a sequence of freesurfer shell calls.
     """
 
-    def __init__(self, proj_name, subjects_dir=None, t1_series=None,
+    def __init__(self, proj_name=None, subjects_dir=None, t1_series=None,
                  verbose=True):
         super(Freesurfer, self).__init__(proj_name)
 
-        self.info = dict(io_mapping=[])
+        self.info = dict()
 
         if subjects_dir is None:
             if 'SUBJECTS_DIR' in os.environ.keys():
@@ -53,6 +54,9 @@ class Freesurfer(ClusterBatch):
                                  'either by using an argument to this method, '
                                  'or by setting the SUBJECT_DIR environment '
                                  'variable. The directory must exist.')
+        else:
+            # NB the path must be _relative_ to the project dir
+            subjects_dir = os.path.join('/projects', proj_name, subjects_dir)
 
         enforce_path_exists(subjects_dir)
         self.info.update(subjects_dir=subjects_dir)
@@ -63,9 +67,8 @@ class Freesurfer(ClusterBatch):
         # Consider placing other vars here
 
     def recon_all(self, subject, t1_series=None, hemi='both',
-                  process_flag='all',
-                  recon_bin='/usr/local/freesurfer/bin/recon-all',
-                  logfile=None, n_threads=4):
+                  process_flag='all', queue='long.q', n_threads=1,
+                  recon_bin='/usr/local/freesurfer/bin/recon-all'):
 
         """Build a Freesurfer command for later execution.
 
@@ -81,8 +84,10 @@ class Freesurfer(ClusterBatch):
                 'Subject {0} not found in database!'.format(subject))
         cur_subj_dir = os.path.join(self.info['subjects_dir'], subject)
 
-        # Start building command
-        cmd = recon_bin + ' -{0} -subjid {1}'.format(process_flag, subject)
+        # Start building command, force subjects_dir on cluster nodes
+        cmd = (recon_bin +
+               ' -{0} -subjid {1}'.format(process_flag, subject) +
+               ' -sd {0}'.format(self.info['subjects_dir']))
 
         if hemi != 'both':
             if hemi not in ['lh', 'rh']:
@@ -105,10 +110,12 @@ class Freesurfer(ClusterBatch):
                 raise RuntimeError('No series found matching {0} for subject '
                                    '{1}'.format(t1_series, subject))
             elif len(series) > 1:
+                print('Multiple series match the target:')
+                print([s['seriename'] for s in series])
                 raise RuntimeError('More than one MR series found that '
                                    'matches the pattern {0}'.format(t1_series))
             dicom_path = os.path.join(series[0]['path'], series[0]['files'][0])
             cmd += ' -i {dcm_pth:s}'.format(dcm_pth=dicom_path)
 
-        self.add_job(cmd, queue='long.q', n_threads=n_threads,
+        self.add_job(cmd, queue=queue, n_threads=n_threads,
                      job_name='recon-all')
