@@ -7,3 +7,4 @@
 
 from .maxfilter import Maxfilter
 from .mne_python import MNEPython
+from .freesurfer import Freesurfer
