@@ -135,7 +135,7 @@ class Freesurfer(ClusterBatch):
         args, kwargs = parse_arguments(eval('self.' + method))
 
         for sub in subjects:
-            cmd = 'self.' + method + '({0}'.format(sub)
+            cmd = 'self.' + method + "('{0}'".format(sub)
             for k, v in kwargs.iteritems():
                 if isinstance(v, string_types):
                     cmd += ", {0}='{1}''".format(k, v)
