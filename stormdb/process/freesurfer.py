@@ -75,6 +75,10 @@ class Freesurfer(ClusterBatch):
             Input file name
         """
 
+        qy = Query(self.proj_name)
+        if subject not in qy.get_subjects():
+            raise RuntimeError(
+                'Subject {0} not found in database!'.format(subject))
         cur_subj_dir = os.path.join(self.info['subjects_dir'], subject)
 
         # Start building command
@@ -94,7 +98,6 @@ class Freesurfer(ClusterBatch):
                 else:
                     t1_series = self.info['t1_series']
 
-            qy = Query(self.proj_name)
             series = qy.filter_series(description=t1_series,
                                       subjects=subject,
                                       modalities="MR")
