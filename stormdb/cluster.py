@@ -359,6 +359,12 @@ class ClusterBatch(object):
             self.logger.addHandler(stdout_stream)
         self.verbose = verbose
 
+        # Get docstring for add_job from ClusterJob.__init__!
+        doc = ClusterJob.__doc__
+        doc = doc[doc.find('\n'):]  # Strip first line
+        doc = "Add a ClusterJob to the list (batch) of jobs." + doc
+        self.add_job.__func__.__doc__ = doc
+
     @property
     def verbose(self):
         if self.logger.getLevel() > logging.DEBUG:
