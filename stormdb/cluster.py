@@ -346,8 +346,9 @@ class ClusterBatch(object):
     def __init__(self, proj_name, verbose=False):
         self.cluster = Cluster()
         # let fail if bad proj_name
-        Query(proj_name)._check_login_credentials()
-        self.proj_name = proj_name
+        qy = Query(proj_name)  # if None, read proj_name from env
+        qy._check_login_credentials()
+        self.proj_name = qy.proj_name
         self._joblist = []
 
         self.logger = logging.getLogger('ClusterBatchLogger')
