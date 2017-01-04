@@ -24,27 +24,28 @@ class Freesurfer(ClusterBatch):
         The name of the project. If None, will read MINDLABPROJ from
         environment.
     subjects_dir : str | None
-        Relative path to the Freesurfer SUBJECTS_DIR
-        (e.g. 'scratch/fs_subjects_dir'). If None, we'll first try to read
-        the corresponding environment variable from the shell (default).
-    t1_series : str | None
-        The name of the T1-weighted sequence to use. If None, this must be
-        defined at job creation time.
+        Path to the Freesurfer SUBJECTS_DIR. You may also specify the path
+        relative to the project directory (e.g. 'scratch/fs_subjects_dir').
+        If None, we'll try to read the corresponding environment variable
+        from the shell (default).
+    t1_series : str (optional)
+        The name of the T1-weighted MR series to use for cortex extraction.
+        This parameter is optional, it only has an effect when running
+        recon-all for the first time (mri_convert from DICOM to mgz).
     verbose : bool
-        If True (default), print out a bunch of information as we go.
+        If True, print out extra information as we go (default: False).
 
     Attributes
     ----------
     info : dict
-        Various info
-    joblist : list of ClusterJob's
-        If defined, represents a sequence of freesurfer shell calls.
+        See `Freesurfer().info.keys()` for contents.
     """
 
     def __init__(self, proj_name=None, subjects_dir=None, t1_series=None,
-                 verbose=True):
-        super(Freesurfer, self).__init__(proj_name)
+                 verbose=False):
+        super(Freesurfer, self).__init__(proj_name, verbose=verbose)
 
+        self.verbose = verbose
         self.info = dict(valid_subjects=Query(proj_name).get_subjects())
 
         if subjects_dir is None:
@@ -56,8 +57,10 @@ class Freesurfer(ClusterBatch):
                                  'or by setting the SUBJECT_DIR environment '
                                  'variable. The directory must exist.')
         else:
-            # NB the path must be _relative_ to the project dir
-            subjects_dir = os.path.join('/projects', proj_name, subjects_dir)
+            if not subjects_dir.startswith('/'):
+                # the path can be _relative_ to the project dir
+                subjects_dir = os.path.join('/projects', proj_name,
+                                            subjects_dir)
 
         enforce_path_exists(subjects_dir)
         self.info.update(subjects_dir=subjects_dir)
@@ -68,14 +71,32 @@ class Freesurfer(ClusterBatch):
         # Consider placing other vars here
 
     def recon_all(self, subject, t1_series=None, hemi='both',
-                  process_flag='all', queue='long.q', n_threads=1,
+                  directive='all', queue='long.q', n_threads=1,
                   recon_bin='/usr/local/freesurfer/bin/recon-all'):
-        """Build a Freesurfer command for later execution.
+        """Build a Freesurfer recon-all command for later execution.
 
         Parameters
         ----------
-        in_fname : str
-            Input file name
+        subject : str
+            Name (ID) of subject as a string. Both number and 3-character
+            code must be given.
+        directive : str
+            The tasks for recon-all to run; default to 'all'. Run
+            `recon-all -help` for list of options.
+        t1_series : str | None
+            The name of the T1-weighted MR series to use for cortex extraction.
+            This parameter is optional, it only has an effect when running
+            recon-all for the first time (mri_convert from DICOM to mgz). If
+            None, the value given at object creation time will be used.
+        hemi : str (optional)
+            Defaults to 'both'. You may also specify either 'lh' or 'rh'.
+        queue : str (optional)
+            Cluster queue to submit the jobs to (default: 'long.q').
+        n_threads : int (optional)
+            Number of parallel CPU cores to request for the job; default is 1.
+            NB: not all queues support multi-threaded execution.
+        recon_bin : str (optional)
+            Path to `recon-all` executable.
         """
 
         if subject not in self.info['valid_subjects']:
@@ -85,7 +106,7 @@ class Freesurfer(ClusterBatch):
 
         # Start building command, force subjects_dir on cluster nodes
         cmd = (recon_bin +
-               ' -{0} -subjid {1}'.format(process_flag, subject) +
+               ' -{0} -subjid {1}'.format(directive, subject) +
                ' -sd {0}'.format(self.info['subjects_dir']))
 
         if hemi != 'both':
@@ -151,3 +172,6 @@ class Freesurfer(ClusterBatch):
 
             cmd += ')'
             eval(cmd)
+
+        self.logger.info(
+            'Successfully prepared {0} jobs.'.format(n=len(subjects)))

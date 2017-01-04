@@ -6,7 +6,7 @@ class MNEPython(ClusterBatch):
     """Clusterised mne-python commands.
     """
     def __init__(self, proj_name, bad=[], verbose=True):
-        super(MNEPython, self).__init__(proj_name)
+        super(MNEPython, self).__init__(proj_name, verbose=verbose)
 
         self.info = dict(bad=bad, io_mapping=[])
 

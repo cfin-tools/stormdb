@@ -31,18 +31,16 @@ class Maxfilter(ClusterBatch):
     bad : list
         List of a priori bad channels (default: empty list)
     verbose : bool
-        If True (default), print out a bunch of information as we go.
+        If True, print out extra information as we go (default: False).
 
     Attributes
     ----------
     info : dict
         Various info
-    joblist : list of ClusterJob's
-        If defined, represents a sequence of maxfilter shell calls.
     """
 
-    def __init__(self, proj_name, bad=[], verbose=True):
-        super(Maxfilter, self).__init__(proj_name)
+    def __init__(self, proj_name, bad=[], verbose=False):
+        super(Maxfilter, self).__init__(proj_name, verbose=verbose)
 
         self.info = dict(bad=bad, io_mapping=[])
         # Consider placing other vars here
