@@ -109,9 +109,10 @@ class ClusterJob(object):
     Parameters
     ----------
     cmd : str | list of str
-        The shell commands to submit to the cluster as a single job.
-    proj_name : str
-        The StormDB project name (compulsory).
+        The shell command(s) to submit to the cluster as a single job.
+    proj_name : str | None
+        The name of the project. If None, will read MINDLABPROJ from
+        environment.
     queue : str
         The name of the queue to submit the job to (default: 'short.q').
     h_vmem : str | None
@@ -341,7 +342,9 @@ class ClusterJob(object):
 
 
 class ClusterBatch(object):
-    """Many ClusterJob's to be submitted together as a batch
+    """Many ClusterJob's to be submitted together as a batchi.
+
+    This docstring should be overwritten by the children.
     """
     def __init__(self, proj_name, verbose=False):
         self.cluster = Cluster()
@@ -374,6 +377,7 @@ class ClusterBatch(object):
 
     @verbose.setter
     def verbose(self, value):
+        """Set to True for more detailed runtime information."""
         if not isinstance(value, bool):
             raise RuntimeError('Set verbose to True or False!')
         elif value is True:
@@ -382,6 +386,7 @@ class ClusterBatch(object):
             self.logger.setLevel(logging.INFO)
 
     def kill(self, jobid=None):
+        """Kill (delete) all the jobs in the batch."""
         for job in self._joblist:
             if (jobid is None or
                     (jobid is not None and int(job._jobid) == int(jobid))):
@@ -392,18 +397,18 @@ class ClusterBatch(object):
 
     @property
     def commands(self):
+        """Return list of commands in the batch."""
         cmdlist = [job.cmd for job in self._joblist]
         return cmdlist
 
     def add_job(self, cmd, **kwargs):
-        # queue='short.q', n_threads=1,
-        #         cwd=True, job_name=None, cleanup=True):
-        """See ClusterJob for arguments!
+        """This is replaced in __init__ by ClusterJob.__doc__!
         """
         self._joblist += [ClusterJob(cmd, self.proj_name, **kwargs)]
 
     @property
     def status(self):
+        """Print status of cluster jobs."""
         for ij, job in enumerate(self._joblist):
             self.logger.info('#{ij:d} ({jid:}): '
                              '{jst}'.format(ij=ij + 1, jid=job._jobid,

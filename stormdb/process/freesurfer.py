@@ -70,7 +70,7 @@ class Freesurfer(ClusterBatch):
 
         # Consider placing other vars here
 
-    def recon_all(self, subject, t1_series=None, hemi='both',
+    def recon_all(self, subject, t1_series=None, hemi='both', force=False,
                   directive='all', queue='long.q', n_threads=1,
                   recon_bin='/usr/local/freesurfer/bin/recon-all'):
         """Build a Freesurfer recon-all command for later execution.
@@ -97,6 +97,8 @@ class Freesurfer(ClusterBatch):
             NB: not all queues support multi-threaded execution.
         recon_bin : str (optional)
             Path to `recon-all` executable.
+        force : bool
+            If True, overwrite existing analyses (default: False).
         """
 
         if subject not in self.info['valid_subjects']:
@@ -136,6 +138,9 @@ class Freesurfer(ClusterBatch):
                                    'matches the pattern {0}'.format(t1_series))
             dicom_path = os.path.join(series[0]['path'], series[0]['files'][0])
             cmd += ' -i {dcm_pth:s}'.format(dcm_pth=dicom_path)
+
+        if force:
+            cmd += ' -force'
 
         self.add_job(cmd, queue=queue, n_threads=n_threads,
                      job_name='recon-all')
