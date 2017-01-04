@@ -1,27 +1,59 @@
-from .base import check_destination_writable, check_source_readable
+"""
+=========================
+Classes related to SimNIBS
+
+http://www.simnibs.de
+=========================
+
+"""
+# Author: Chris Bailey <cjb@cfin.au.dk>
+#
+# License: BSD (3-clause)
+import os
+from six import string_types
+from .base import (enforce_path_exists, check_source_readable, parse_arguments)
+from ..access import Query
 from ..cluster import ClusterBatch
 
 
 class SimNIBS(ClusterBatch):
-    """Clusterised SimNIBS pipeline.
+    """ Object for running SimNIBS in the StormDB environment.
 
-       http://www.simnibs.de
+    NB! You must make sure that SimNIBS is enabled in your environment.
+    The easiest way to achieve this is to add the following line to ~/.bashrc:
+        use simnibs
+
+    Note that a successfull Freesurfer `recon-all -all`-reconstruction is
+    a prerequisite for running SimNIBS. See :class:`.freesurfer.Freesurfer`
+    for details.
+
+    Parameters
+    ----------
+    proj_name : str | None
+        The name of the project. If None, will read MINDLABPROJ from
+        environment.
+    subjects_dir : str | None
+        Path to the Freesurfer SUBJECTS_DIR. You may also specify the path
+        relative to the project directory (e.g. 'scratch/fs_subjects_dir').
+        If None, we'll try to read the corresponding environment variable
+        from the shell (default).
+    verbose : bool
+        If True, print out extra information as we go (default: False).
+
+    Attributes
+    ----------
+    info : dict
+        See `SimNIBS().info.keys()` for contents.
     """
-    def __init__(self, proj_name, bad=[], verbose=True):
-        super(SimNIBS, self).__init__(proj_name)
+    def __init__(self, proj_name, bad=[], verbose=False):
+        super(SimNIBS, self).__init__(proj_name, verbose=verbose)
 
-        self.info = dict(bad=bad, io_mapping=[])
+        self.verbose = verbose
+        self.info = dict(valid_subjects=Query(proj_name).get_subjects())
 
-    def build_cmd(self, t1_fs=None, t2_hb=None, t1_hb=None, t2_fs=None,
-                  in_fname, out_fname, origin='0 0 40',
-                  frame='head', bad=None, autobad='off', skip=None,
-                  force=False, st=False, st_buflen=16.0,
-                  st_corr=0.96, trans=None, movecomp=False,
-                  headpos=False, hp=None, hpistep=None,
-                  hpisubt=None, hpicons=True, linefreq=None,
-                  cal=None, ctc=None, mx_args='',
-                  maxfilter_bin='/neuro/bin/util/maxfilter',
-                  logfile=None, n_threads=4):
+    def mri2mesh(self, t1_fs=None, t2_hb=None, t1_hb=None, t2_fs=None,
+                 simnibs_dir='/usr/local/simnibs',
+                 directive='all', queue='long.q', n_threads=1):
 
         """Build a NeuroMag MaxFilter command for later execution.
 
@@ -34,9 +66,17 @@ class SimNIBS(ClusterBatch):
         Parameters
         ----------
         t1_fs : str
-            Input file name
-        out_fname : str
-            Output file name
+            The name of the T1-weighted & fat staturation-enabled MR series to
+            use for surface creation. Optional: may also be defined later.
+        t2_hb : str
+            The name of the T2-weighted High Bandwidth MR series to
+            use for surface creation. Optional: may also be defined later.
+        t1_hb : str (optional)
+            The name of the T1-weighted High Bandwidth MR series to
+            use for surface creation. Optional: may also be defined later.
+        t2_fs : str (optional)
+            The name of the T2-weighted & fat staturation-enabled MR series to
+            use for surface creation. Optional: may also be defined later.
         n_threads : int
             Number of parallel threads to execute on (default: 4)
     """
