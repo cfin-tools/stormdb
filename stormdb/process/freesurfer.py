@@ -174,4 +174,4 @@ class Freesurfer(ClusterBatch):
             eval(cmd)
 
         self.logger.info(
-            'Successfully prepared {0} jobs.'.format(n=len(subjects)))
+            'Successfully prepared {0} jobs.'.format(len(subjects)))
