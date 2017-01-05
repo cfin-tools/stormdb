@@ -122,9 +122,9 @@ class ClusterJob(object):
     n_threads : int
         If > 1 (default), the job must be submitted to a queue that is capapble
         of multi-threaded parallelism.
-    cwd : bool
-        Set the job's working directory to the one the job is initiated from
-        (default: True).
+    working_dir : str
+        Set the job's working directory. May either be an existing path, or
+        'cwd' for current working directory (default: 'cwd').
     job_name : str | None
         Name of job (shows up in the output of qstat). If None, "py-wrapper"
         is used.
@@ -146,7 +146,7 @@ class ClusterJob(object):
         be modified once defined).
     """
     def __init__(self, cmd=None, proj_name=None, queue='short.q', h_vmem=None,
-                 n_threads=1, cwd=True, job_name=None, cleanup=True):
+                 n_threads=1, working_dir='cwd', job_name=None, cleanup=True):
         self.cluster = Cluster()
 
         if not cmd:
@@ -189,8 +189,15 @@ class ClusterJob(object):
             opt_h_vmem_flag = "#$ -l h_vmem={:s}".format(self.h_vmem)
         if job_name is None:
             job_name = 'py-wrapper'
-        if cwd:
-            cwd_flag = '#$ -cwd'
+        if working_dir is not None and isinstance(working_dir, string_types):
+            if working_dir == 'cwd':
+                cwd_flag = '#$ -cwd'
+            else:
+                if not os.path.exists(working_dir):
+                    raise ValueError(
+                        'The working directory specified does not exist '
+                        '({})'.format(working_dir))
+                cwd_flag = '#$ -d {:s}'.format(working_dir)
 
         self._create_qsub_script(job_name, cwd_flag,
                                  opt_threaded_flag, opt_h_vmem_flag)
