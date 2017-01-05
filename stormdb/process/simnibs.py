@@ -23,19 +23,24 @@ class SimNIBS(ClusterBatch):
     The easiest way to achieve this is to add the following line to ~/.bashrc:
         use simnibs
 
-    Note that a successfull Freesurfer `recon-all -all`-reconstruction is
-    a prerequisite for running SimNIBS. See :class:`.freesurfer.Freesurfer`
-    for details.
+    Note that SimNIBS "prepares" the T1-image fed into Freesurfer, before
+    calling `recon-all`, using the T2-weighted image to mask some of the dura.
+    It's therefore best to let `mri2mesh` deal with cortex extraction. If you
+    want the non-modified Freesurfer-approach, see
+    :class:`.freesurfer.Freesurfer` for details.
 
     Parameters
     ----------
     proj_name : str | None
         The name of the project. If None, will read MINDLABPROJ from
         environment.
-    subjects_dir : str | None
-        Path to the Freesurfer SUBJECTS_DIR. You may also specify the path
-        relative to the project directory (e.g. 'scratch/fs_subjects_dir').
-        If None, we'll try to read the corresponding environment variable
+    output_dir : str | None
+        Path to place SimNIBS output in. You may also specify the path
+        relative to the project directory (e.g. 'scratch/sn_subjects_dir').
+        The path will be created if it does not exists.
+        `mri2mesh` output is placed in output_dir/m2m_*, whereas
+        `recon-all` output goes into output_dir/fs_* (* refers to a subject).
+        If None, we'll try to read the environment variable SN_SUBJECTS_DIR
         from the shell (default).
     verbose : bool
         If True, print out extra information as we go (default: False).
@@ -45,41 +50,88 @@ class SimNIBS(ClusterBatch):
     info : dict
         See `SimNIBS().info.keys()` for contents.
     """
-    def __init__(self, proj_name, bad=[], verbose=False):
+    def __init__(self, proj_name, output_dir=None, verbose=False):
         super(SimNIBS, self).__init__(proj_name, verbose=verbose)
 
+        if output_dir is None:
+            if 'SN_SUBJECTS_DIR' in os.environ.keys():
+                output_dir = os.environ['SN_SUBJECTS_DIR']
+            else:
+                raise ValueError(
+                    'No SN_SUBJECTS_DIR defined! You must do so either by '
+                    'passing output_dir to this method, or by setting the '
+                    'SN_SUBJECT_DIR environment variable. The directory must '
+                    'exist.')
+        else:
+            if not output_dir.startswith('/'):
+                # the path can be _relative_ to the project dir
+                output_dir = os.path.join('/projects', proj_name,
+                                          output_dir)
+
+        enforce_path_exists(output_dir)
+
+        self.info.update(output_dir=output_dir)
         self.verbose = verbose
         self.info = dict(valid_subjects=Query(proj_name).get_subjects())
 
-    def mri2mesh(self, t1_fs=None, t2_hb=None, t1_hb=None, t2_fs=None,
+    def mri2mesh(self, subject, t1_fs=None, t2_hb=None,
+                 directive=['brain', 'subcort', 'head'],
+                 t1_hb=None, t2_fs=None,
                  simnibs_dir='/usr/local/simnibs',
-                 directive='all', queue='long.q', n_threads=1):
+                 queue='long.q', n_threads=1):
 
-        """Build a NeuroMag MaxFilter command for later execution.
-
-        See the Maxfilter manual for details on the different options!
-
-        Things to implement
-        * check that cal-file matches date in infile!
-        * check that maxfilter binary is OK
+        """Build a SimNIBS mri2mesh-command for later execution.
 
         Parameters
         ----------
+        subject : str
+            Name (ID) of subject as a string. Both number and 3-character
+            code must be given.
         t1_fs : str
             The name of the T1-weighted & fat staturation-enabled MR series to
-            use for surface creation. Optional: may also be defined later.
+            use for surface creation.
         t2_hb : str
             The name of the T2-weighted High Bandwidth MR series to
-            use for surface creation. Optional: may also be defined later.
+            use for surface creation.
+        directive : str | list of str
+            Directive to pass to `mri2mesh`; e.g., 'brain' -> --brain
+            Multiple directives may be passed as a list.
         t1_hb : str (optional)
             The name of the T1-weighted High Bandwidth MR series to
             use for surface creation. Optional: may also be defined later.
         t2_fs : str (optional)
             The name of the T2-weighted & fat staturation-enabled MR series to
             use for surface creation. Optional: may also be defined later.
-        n_threads : int
-            Number of parallel threads to execute on (default: 4)
-    """
+        queue : str (optional)
+            Cluster queue to submit the jobs to (default: 'long.q').
+        n_threads : int (optional)
+            Number of parallel CPU cores to request for the job; default is 1.
+            NB: not all queues support multi-threaded execution.
+        """
+        if subject not in self.info['valid_subjects']:
+            raise RuntimeError(
+                'Subject {0} not found in database!'.format(subject))
+
+        if not isinstance(directive, (string_types, list)):
+            raise RuntimeError(
+                'Directive should be str or list of str, not '
+                '{0}'.format(type(directive)))
+        directives_str = ' --' + ' --'.join(directive)
+
+        mr_inputs = (t1_fs, t2_hb, t1_hb, t2_fs)  # fixed order!
+        mr_inputs_str = ''
+        for mri in mr_inputs:
+            if mri is not None and not os.path.isfile(mri):
+                raise IOError('Input file {:s} missing!'.format(mri))
+            else:
+                mr_inputs_str += ' {:s}'.format(mri)
+
+        # Build command
+        cmd = 'mri2mesh ' + directives_str + mr_inputs_str
+
+        # NB implement working_dir-argument!
+        self.add_job(cmd, queue=queue, n_threads=n_threads,
+                     job_name='mri2mesh', working_dir=self.info['output_dir'])
 
 
 def make_symbolic_links(subject, subjects_dir):
