@@ -11,12 +11,17 @@ import subprocess as subp
 import os
 import shutil
 import tempfile
+from glob import glob
 
 
 def convert_dicom_to_nifti(first_dicom, output_fname,
                            converter='mri_convert'):
     tmpdir = tempfile.mkdtemp()
-    shutil.copytree(os.path.dirname(first_dicom), tmpdir)
+    dicom_dir = os.path.dirname(first_dicom)
+    first_dicom = os.path.join(tmpdir, os.path.basename(first_dicom))
+    for dcm in glob(os.path.join(dicom_dir, '*.*')):
+        shutil.copy(dcm, tmpdir)
+
     if converter == 'mri_convert':
         cmd = ' '.join(converter, first_dicom, output_fname)
     else:
