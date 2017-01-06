@@ -23,12 +23,12 @@ def convert_dicom_to_nifti(first_dicom, output_fname,
         shutil.copy(dcm, tmpdir)
 
     if converter == 'mri_convert':
-        cmd = ' '.join(converter, first_dicom, output_fname)
+        cmd = ' '.join([converter, first_dicom, output_fname])
     else:
         raise NotImplementedError('{:s} not known.'.format(converter))
 
     try:
-        subp.check_output([cmd], stderr=subp.STDOUT, shell=False)
+        subp.check_output([cmd], stderr=subp.STDOUT, shell=True)
     except subp.CalledProcessError as cpe:
         raise RuntimeError('Conversion failed with error message: '
                            '{:s}'.format(cpe.returncode, cpe.output))
