@@ -15,7 +15,7 @@ parser.add_argument('-m', '--h_vmem', type=str, default=None,
                           'Format: M=megabytes, G=gigabytes (e.g. 30G).'))
 parser.add_argument('-p', '--project', type=str, default=None,
                     help='Name of project (or set MINDLABPROJ)')
-parser.add_argument('-d', '--working_dir', type=str, default='cwd',
+parser.add_argument('-w', '--working_dir', type=str, default='cwd',
                     help='Working directory for the job (default: cwd)')
 parser.add_argument('--noclean', action='store_false',
                     help='Do not clean up the qsub submission script.')
