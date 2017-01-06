@@ -195,7 +195,7 @@ class ClusterJob(object):
                 cwd_flag = '#$ -cwd'
             else:
                 enforce_path_exists(working_dir)
-                cwd_flag = '#$ -d {:s}'.format(working_dir)
+                cwd_flag = '#$ -wd {:s}'.format(working_dir)
 
         self._create_qsub_script(job_name, cwd_flag,
                                  opt_threaded_flag, opt_h_vmem_flag)

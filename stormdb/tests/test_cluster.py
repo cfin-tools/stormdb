@@ -29,4 +29,6 @@ def test_job_working_dir():
     assert_true('$ -cwd\n' in job._qsub_script)
     job = ClusterJob(cmd=test_cmd, proj_name=proj_name,
                      queue=test_queue, working_dir=working_dir)
-    assert_true('$ -d {:s}\n'.format(working_dir) in job._qsub_script)
+    assert_true('$ -wd {:s}\n'.format(working_dir) in job._qsub_script)
+
+    job.submit()
