@@ -15,7 +15,7 @@ import re
 from six import string_types
 from os.path import expanduser
 from .access import Query
-from ..base import enforce_path_exists
+from .base import enforce_path_exists
 
 
 QSUB_SCHEMA = """
