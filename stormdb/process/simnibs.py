@@ -144,10 +144,11 @@ class SimNIBS(ClusterBatch):
                     warn('The file {:s} already exists: will use '
                          'it instead of re-converting.'.format(mri))
 
-            mr_inputs_str += ' ' + mri if mri is not None
+            if mri is not None:
+                mr_inputs_str += ' ' + mri
 
         # Build command
-        cmd = 'mri2mesh ' + directives_str + mr_inputs_str
+        cmd = 'mri2mesh ' + directives_str + ' ' + subject + mr_inputs_str
 
         # NB implement working_dir-argument!
         self.add_job(cmd, queue=queue, n_threads=n_threads,
