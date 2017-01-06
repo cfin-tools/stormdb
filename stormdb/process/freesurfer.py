@@ -10,7 +10,8 @@ Classes related to Freesurfer
 import os
 from six import string_types
 
-from .base import (enforce_path_exists, check_source_readable, parse_arguments)
+from ..base import (enforce_path_exists, check_source_readable,
+                    parse_arguments)
 from ..access import Query
 from ..cluster import ClusterBatch
 

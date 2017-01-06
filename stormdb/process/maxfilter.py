@@ -17,7 +17,7 @@ import numpy as np
 from mne.io import Raw
 from mne.bem import fit_sphere_to_headshape
 
-from .base import check_destination_writable, check_source_readable
+from ..base import check_destination_writable, check_source_readable
 from ..cluster import ClusterBatch
 
 

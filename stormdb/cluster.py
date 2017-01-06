@@ -15,6 +15,7 @@ import re
 from six import string_types
 from os.path import expanduser
 from .access import Query
+from ..base import enforce_path_exists
 
 
 QSUB_SCHEMA = """
@@ -193,10 +194,7 @@ class ClusterJob(object):
             if working_dir == 'cwd':
                 cwd_flag = '#$ -cwd'
             else:
-                if not os.path.exists(working_dir):
-                    raise ValueError(
-                        'The working directory specified does not exist '
-                        '({})'.format(working_dir))
+                enforce_path_exists(working_dir)
                 cwd_flag = '#$ -d {:s}'.format(working_dir)
 
         self._create_qsub_script(job_name, cwd_flag,
