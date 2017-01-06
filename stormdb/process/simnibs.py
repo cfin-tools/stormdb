@@ -134,7 +134,7 @@ class SimNIBS(ClusterBatch):
                 nii_path = os.path.join(self.info['output_dir'], 'nifti',
                                         subject)
                 mkdir_p(nii_path)
-                mri = os.path.join(nii_path, mri + '.nii.gz')
+                mri = os.path.join(nii_path, subject + '_' + mri + '.nii.gz')
                 if not os.path.isfile(mri):  # if exists, don't redo!
                     self.logger.info('Converting DICOM to Nifti, this will '
                                      'take about 15 seconds...')
@@ -144,7 +144,7 @@ class SimNIBS(ClusterBatch):
                     warn('The file {:s} already exists: will use '
                          'it instead of re-converting.'.format(mri))
 
-            mr_inputs_str += ' ' + mri
+            mr_inputs_str += ' ' + mri if mri is not None
 
         # Build command
         cmd = 'mri2mesh ' + directives_str + mr_inputs_str
