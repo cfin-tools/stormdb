@@ -53,7 +53,7 @@ class SimNIBS(ClusterBatch):
     info : dict
         See `SimNIBS().info.keys()` for contents.
     """
-    def __init__(self, proj_name, output_dir=None, verbose=False):
+    def __init__(self, proj_name=None, output_dir=None, verbose=False):
         super(SimNIBS, self).__init__(proj_name, verbose=verbose)
 
         if output_dir is None:
@@ -68,14 +68,14 @@ class SimNIBS(ClusterBatch):
         else:
             if not output_dir.startswith('/'):
                 # the path can be _relative_ to the project dir
-                output_dir = os.path.join('/projects', proj_name,
+                output_dir = os.path.join('/projects', self.proj_name,
                                           output_dir)
 
         enforce_path_exists(output_dir)
 
+        self.info = dict(valid_subjects=Query(proj_name).get_subjects())
         self.info.update(output_dir=output_dir)
         self.verbose = verbose
-        self.info = dict(valid_subjects=Query(proj_name).get_subjects())
 
     def mri2mesh(self, subject, t1_fs=None, t2_hb=None,
                  directive=['brain', 'subcort', 'head'],
@@ -127,9 +127,7 @@ class SimNIBS(ClusterBatch):
         mr_inputs = (t1_fs, t2_hb, t1_hb, t2_fs)  # fixed order!
         mr_inputs_str = ''
         for mri in mr_inputs:
-            if mri is not None and not os.path.isfile(mri):
-                raise IOError('Input file {:s} missing!'.format(mri))
-            elif '/' not in mri and '.nii' not in mri:
+            if mri is not None and '/' not in mri and '.nii' not in mri:
                 series = _get_unique_series(Query(self.proj_name), mri,
                                             subject, 'MR')
                 dcm = os.path.join(series[0]['path'], series[0]['files'][0])
