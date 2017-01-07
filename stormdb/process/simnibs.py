@@ -176,7 +176,6 @@ class SimNIBS(ClusterBatch):
         # Build command
         cmd = 'mri2mesh ' + directives_str + ' ' + subject + mr_inputs_str
 
-        # NB implement working_dir-argument!
         self.add_job(cmd, queue=queue, n_threads=n_threads,
                      job_name='mri2mesh', working_dir=self.info['output_dir'])
 
