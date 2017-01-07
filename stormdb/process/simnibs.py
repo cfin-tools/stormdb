@@ -179,7 +179,6 @@ class SimNIBS(ClusterBatch):
         self.add_job(cmd, queue=queue, n_threads=n_threads,
                      job_name='mri2mesh', working_dir=self.info['output_dir'])
 
-
 # def make_symbolic_links(subject, subjects_dir):
 #     """Make symblic links between FS dir and subjects_dir.
 #     Parameters
