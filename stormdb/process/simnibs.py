@@ -79,7 +79,8 @@ class SimNIBS(ClusterBatch):
 
     def mri2mesh(self, subject, t1_fs=None, t2_hb=None,
                  directive=['brain', 'subcort', 'head'],
-                 t1_hb=None, t2_fs=None,
+                 analysis_name=None,
+                 t1_hb=None, t2_fs=None, t2mask=False, t2pial=False,
                  simnibs_dir='/usr/local/simnibs',
                  queue='long.q', n_threads=1):
 
@@ -102,6 +103,15 @@ class SimNIBS(ClusterBatch):
         directive : str | list of str
             Directive to pass to `mri2mesh`; e.g., 'brain' -> --brain
             Multiple directives may be passed as a list.
+        analysis_name : str | None
+            Optional suffix to add to subject name (e.g. '_with_t2mask')
+        t2mask : bool
+            Tell mri2mesh to use the (high bandwidth) T2 image to mask out
+            some dura on the T1 (fs) before running recon-all.
+        t2pial : bool
+            Tell recon-all to use the T2 image to improve extraction. NB:
+            comments in mri2mesh indicate that this only works well when the
+            T2 is high-res (ca. 1 mm isotropic). Consider t2mask instead.
         t1_hb : str (optional)
             The name of the T1-weighted High Bandwidth MR series to
             use for surface creation. Optional: may also be defined later.
@@ -122,6 +132,14 @@ class SimNIBS(ClusterBatch):
             raise RuntimeError(
                 'Directive should be str or list of str, not '
                 '{0}'.format(type(directive)))
+        directive = [directive] if isinstance(directive, string_types)
+
+        if t2mask and t2pial:
+            raise ValueError('t2mask and t2pial cannot be used together!')
+        directive.append('t2mask') if t2mask
+        directive.append('t2pial') if t2pial
+
+        # build directive string
         directives_str = ' --' + ' --'.join(directive)
 
         mr_inputs = (t1_fs, t2_hb, t1_hb, t2_fs)  # fixed order!
@@ -146,6 +164,11 @@ class SimNIBS(ClusterBatch):
 
             if mri is not None:
                 mr_inputs_str += ' ' + mri
+
+        if analysis_name is not None:
+            if not isinstance(analysis_name, string_types):
+                raise ValueError('Analysis name suffix must be a string.')
+            subject += analysis_name
 
         # Build command
         cmd = 'mri2mesh ' + directives_str + ' ' + subject + mr_inputs_str
