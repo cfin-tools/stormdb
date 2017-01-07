@@ -132,12 +132,15 @@ class SimNIBS(ClusterBatch):
             raise RuntimeError(
                 'Directive should be str or list of str, not '
                 '{0}'.format(type(directive)))
-        directive = [directive] if isinstance(directive, string_types)
+        if isinstance(directive, string_types):
+            directive = [directive]
 
         if t2mask and t2pial:
             raise ValueError('t2mask and t2pial cannot be used together!')
-        directive.append('t2mask') if t2mask
-        directive.append('t2pial') if t2pial
+        if t2mask:
+            directive.append('t2mask')
+        if t2pial:
+            directive.append('t2pial')
 
         # build directive string
         directives_str = ' --' + ' --'.join(directive)
