@@ -220,9 +220,9 @@ class SimNIBS(ClusterBatch):
 
         meshfix_opts = ' -u 10 --vertices {:d} --fsmesh'.format(n_vertices)
         bem_dir = os.path.join(fs_dir, 'bem')
-        bem_surfaces = dict(inner_skull='tmp/csf_FS.fsmesh',
-                            outer_skull='tmp/skull_FS.fsmesh',
-                            outer_skin='tmp/skin_FS.fsmesh')
+        bem_surfaces = dict(inner_skull='csf.stl',
+                            outer_skull='skull.stl',
+                            outer_skin='skin.stl')
         for bem_layer, surf in bem_surfaces.items():
             surf_fname = os.path.join(m2m_dir, surf)
             if not check_source_readable(surf_fname):
