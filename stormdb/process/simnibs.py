@@ -238,9 +238,9 @@ class SimNIBS(ClusterBatch):
             xfm = os.path.join(m2m_dir, 'tmp', 'unity.xfm')
 
             cmds += ['mris_transform --dst {xv:s} --src {xv:s} '
-                     '{bfn:s}.fsmesh {xfm:s} {bfn}.surf'
+                    '{bfn:s}.fsmesh {xfm:s} {bfn:s}.surf'
                      .format(xv=xfm_volume, bfn=bem_fname, xfm=xfm)]
-            cmds += ['mv rh.{bfn}.surf {bfn}.surf']
+            cmds += ['rm {bfn:s}.fsmesh'.format(bfn=bem_fname)]
 
             cmd = ';'.join(cmds)
             self.add_job(cmd, queue=queue, n_threads=n_threads,
