@@ -186,6 +186,56 @@ class SimNIBS(ClusterBatch):
         self.add_job(cmd, queue=queue, n_threads=n_threads,
                      job_name='mri2mesh', working_dir=self.info['output_dir'])
 
+    def create_bem_surfaces(self, subject, n_vertices=5120,
+                            analysis_name=None, queue='short.q',
+                            n_threads=1):
+        """Convert mri2mesh output to Freesurfer meshes suitable for BEMs.
+
+        Parameters
+        ----------
+        subject : str
+            Name (ID) of subject as a string. Both number and 3-character
+            code must be given.
+        n_vertices : int
+            Number of vertices to subsample the high-resolution surfaces to
+            (default: 5120).
+        analysis_name : str | None
+            Optional suffix to add to subject name (e.g. '_with_t2mask')
+        """
+        if subject not in self.info['valid_subjects']:
+            raise RuntimeError(
+                'Subject {0} not found in database!'.format(subject))
+
+        if analysis_name is not None:
+            suffix = analysis_name
+        else:
+            suffix = ''
+
+        fs_dir = os.path.join(self.info['output_dir'],
+                              'fs_' + subject + suffix)
+        m2m_dir = os.path.join(self.info['output_dir'],
+                               'm2m_' + subject + suffix)
+        enforce_path_exists(fs_dir)
+        enforce_path_exists(m2m_dir)
+
+        meshfix_opts = ' -u 10 --vertices {:d} --fsmesh'.format(n_vertices)
+        bem_dir = os.path.join(fs_dir, 'bem')
+        bem_surfaces = dict(inner_skull='csf.stl',
+                            outer_skull='skull.stl',
+                            outer_skin='skin.stl')
+        for bem_layer, surf in bem_surfaces.items():
+            surf_fname = os.path.join(m2m_dir, surf)
+            if not check_source_readable(surf_fname):
+                raise RuntimeError(
+                    'Could not find surface {surf:s}; mri2mesh may have exited'
+                    ' with an error, please check.'.format(surf))
+            bem_fname = os.path.join(bem_dir, bem_layer)
+            cmd = 'meshfix {mfopts:s} -o {bfn:s}'.format(mfopts=meshfix_opts,
+                                                         bfn=bem_fname)
+            self.add_job(cmd, queue=queue, n_threads=n_threads,
+                         job_name='meshfix',
+                         working_dir=self.info['output_dir'])
+
 # def make_symbolic_links(subject, subjects_dir):
 #     """Make symblic links between FS dir and subjects_dir.
 #     Parameters
