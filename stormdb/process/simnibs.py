@@ -230,8 +230,8 @@ class SimNIBS(ClusterBatch):
                     'Could not find surface {surf:s}; mri2mesh may have exited'
                     ' with an error, please check.'.format(surf))
             bem_fname = os.path.join(bem_dir, bem_layer)
-            cmd = 'meshfix {mfopts:s} -o {bfn:s}'.format(mfopts=meshfix_opts,
-                                                         bfn=bem_fname)
+            cmd = ('meshfix {sfn:s} {mfo:s} -o {bfn:s}'
+                   .format(sfn=surf_fname, mfo=meshfix_opts, bfn=bem_fname))
             self.add_job(cmd, queue=queue, n_threads=n_threads,
                          job_name='meshfix',
                          working_dir=self.info['output_dir'])
