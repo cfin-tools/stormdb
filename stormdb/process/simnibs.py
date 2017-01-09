@@ -169,7 +169,9 @@ class SimNIBS(ClusterBatch):
                               'it instead of re-converting.'.format(mri))
                     else:
                         warn('Some input files already exist in {:s}; these '
-                             'will be used instead of re-converting.')
+                             'will be used instead of re-converting.'
+                             .format(nii_path))
+
             if mri is not None:
                 mr_inputs_str += ' ' + mri
 

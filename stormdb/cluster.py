@@ -375,7 +375,7 @@ class ClusterBatch(object):
 
     @property
     def verbose(self):
-        if self.logger.getLevel() > logging.DEBUG:
+        if self.logger.level > logging.DEBUG:
             return False
         else:
             return True
