@@ -145,7 +145,8 @@ class SimNIBS(ClusterBatch):
         # build directive string
         directives_str = ' --' + ' --'.join(directive)
 
-        mr_inputs = (t1_fs, t2_hb, t1_hb, t2_fs)  # fixed order!
+        # mri2mesh assumes following fixed order!
+        mr_inputs = (t1_hb, t1_fs, t2_hb, t2_fs)
         mr_inputs_str = ''
         for mri in mr_inputs:
             if mri is not None and '/' not in mri and '.nii' not in mri:
