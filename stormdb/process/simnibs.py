@@ -78,7 +78,7 @@ class SimNIBS(ClusterBatch):
         self.verbose = verbose
 
     def mri2mesh(self, subject, t1_fs=None, t2_hb=None,
-                 directive=['brain', 'subcort', 'head'],
+                 directives=['brain', 'subcort', 'head'],
                  analysis_name=None,
                  t1_hb=None, t2_fs=None, t2mask=False, t2pial=False,
                  simnibs_dir='/usr/local/simnibs',
@@ -100,8 +100,8 @@ class SimNIBS(ClusterBatch):
         t2_hb : str
             The name of the T2-weighted High Bandwidth MR series to
             use for surface creation.
-        directive : str | list of str
-            Directive to pass to `mri2mesh`; e.g., 'brain' -> --brain
+        directives : str | list of str
+            Directives to pass to `mri2mesh`; e.g., 'brain' -> --brain
             Multiple directives may be passed as a list.
         analysis_name : str | None
             Optional suffix to add to subject name (e.g. '_with_t2mask')
@@ -128,22 +128,23 @@ class SimNIBS(ClusterBatch):
             raise RuntimeError(
                 'Subject {0} not found in database!'.format(subject))
 
-        if not isinstance(directive, (string_types, list)):
+        if not isinstance(directives, (string_types, list)):
             raise RuntimeError(
                 'Directive should be str or list of str, not '
-                '{0}'.format(type(directive)))
-        if isinstance(directive, string_types):
-            directive = [directive]
+                '{0}'.format(type(directives)))
+        # This has the dual effect of: i) making a list out of a string, and
+        # ii) COPYING the directives-list to another one
+        mri2mesh_flags = list(directives)
 
         if t2mask and t2pial:
             raise ValueError('t2mask and t2pial cannot be used together!')
         if t2mask:
-            directive.append('t2mask')
+            mri2mesh_flags.append('t2mask')
         if t2pial:
-            directive.append('t2pial')
+            mri2mesh_flags.append('t2pial')
 
         # build directive string
-        directives_str = ' --' + ' --'.join(directive)
+        directives_str = ' --' + ' --'.join(mri2mesh_flags)
 
         # mri2mesh assumes following fixed order!
         mr_inputs = (t1_hb, t1_fs, t2_hb, t2_fs)
@@ -156,16 +157,19 @@ class SimNIBS(ClusterBatch):
                 nii_path = os.path.join(self.info['output_dir'], 'nifti',
                                         subject)
                 mkdir_p(nii_path)
-                mri = os.path.join(nii_path, subject + '_' + mri + '.nii.gz')
+                mri = os.path.join(nii_path, mri + '.nii.gz')
                 if not os.path.isfile(mri):  # if exists, don't redo!
                     self.logger.info('Converting DICOM to Nifti, this will '
                                      'take about 15 seconds...')
                     convert_dicom_to_nifti(dcm, mri)
                     self.logger.info('...done.')
                 else:
-                    warn('The file {:s} already exists: will use '
-                         'it instead of re-converting.'.format(mri))
-
+                    if self.verbose:
+                        print('The file {:s} already exists: will use '
+                              'it instead of re-converting.'.format(mri))
+                    else:
+                        warn('Some input files already exist in {:s}; these '
+                             'will be used instead of re-converting.')
             if mri is not None:
                 mr_inputs_str += ' ' + mri
 
