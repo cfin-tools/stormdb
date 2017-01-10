@@ -219,8 +219,12 @@ class SimNIBS(ClusterBatch):
             enforce_path_exists(fs_dir)
             enforce_path_exists(m2m_dir)
         except IOError as m2m_err:
-            raise RuntimeError(
-                m2m_err + ' Failed to find accessible mri2mesh-folders')
+            msg = ('{0}\nFailed to find accessible mri2mesh-folders; '
+                   'did it complete successfully?'.format(m2m_err))
+            if len(suffix) > 0:
+                msg += ('\nPlease also check that the analysis_name is '
+                        'correct: {0}'.format(analysis_name))
+            raise RuntimeError(msg)
 
         meshfix_opts = ' -u 10 --vertices {:d} --fsmesh'.format(n_vertices)
         bem_dir = os.path.join(fs_dir, 'bem')
