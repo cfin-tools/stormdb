@@ -77,20 +77,16 @@ class SimNIBS(ClusterBatch):
         self.info.update(output_dir=output_dir)
         self.verbose = verbose
 
-    def mri2mesh(self, subject, t1_fs=None, t2_hb=None,
-                 directives=['brain', 'subcort', 'head'],
-                 analysis_name=None,
-                 t1_hb=None, t2_fs=None, t2mask=False, t2pial=False,
-                 simnibs_dir='/usr/local/simnibs',
-                 queue='long.q', n_threads=1):
-
+    def mri2mesh(self, subject, **kwargs):
         """Build a SimNIBS mri2mesh-command for later execution.
 
         Parameters
         ----------
-        subject : str
+        subject : subject ID (str) | list of subject IDs (str) | 'all'
             Name (ID) of subject as a string. Both number and 3-character
-            code must be given.
+            code must be given. Multiple subjects IDs can be passed as a list.
+            The string 'all' is interpreted as all included subjects (i.e.,
+            those that are not excluded) in the database.
         t1_fs : str
             The name of the T1-weighted & fat staturation-enabled MR series to
             use for surface creation.
@@ -102,9 +98,10 @@ class SimNIBS(ClusterBatch):
             use for surface creation.
         directives : str | list of str
             Directives to pass to `mri2mesh`; e.g., 'brain' -> --brain
-            Multiple directives may be passed as a list.
+            Multiple directives may be passed as a list. The default is:
+            ['brain', 'subcort', 'head'], which is suitable for BEM creation.
         analysis_name : str | None
-            Optional suffix to add to subject name (e.g. '_with_t2mask')
+            Optional suffix to add to subject name (e.g. '_t2mask')
         t2mask : bool
             Tell mri2mesh to use the (high bandwidth) T2 image to mask out
             some dura on the T1 (fs) before running recon-all.
@@ -124,6 +121,27 @@ class SimNIBS(ClusterBatch):
             Number of parallel CPU cores to request for the job; default is 1.
             NB: not all queues support multi-threaded execution.
         """
+        if isinstance(subject, (list, tuple)):
+            self.logger.info('Processing multiple subjects:')
+            subjects = subject
+        elif isinstance(subject, string_types):
+            if subject == 'all':
+                self.logger.info('Processing all included subjects:')
+                subjects = self.info['valid_subjects']
+            else:
+                subjects = [subject]
+        for sub in subjects:
+            self.logger.info(sub)
+            self._mri2mesh(sub, **kwargs)
+
+    def _mri2mesh(self, subject, t1_fs=None, t2_hb=None,
+                  directives=['brain', 'subcort', 'head'],
+                  analysis_name=None,
+                  t1_hb=None, t2_fs=None, t2mask=False, t2pial=False,
+                  simnibs_dir='/usr/local/simnibs',
+                  queue='long.q', n_threads=1):
+        "Method for single subjects"
+
         if subject not in self.info['valid_subjects']:
             raise RuntimeError(
                 'Subject {0} not found in database!'.format(subject))
