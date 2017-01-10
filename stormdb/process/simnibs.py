@@ -215,8 +215,12 @@ class SimNIBS(ClusterBatch):
                               'fs_' + subject + suffix)
         m2m_dir = os.path.join(self.info['output_dir'],
                                'm2m_' + subject + suffix)
-        enforce_path_exists(fs_dir)
-        enforce_path_exists(m2m_dir)
+        try:
+            enforce_path_exists(fs_dir)
+            enforce_path_exists(m2m_dir)
+        except IOError as m2m_err:
+            raise RuntimeError(
+                m2m_err + ' Failed to find accessible mri2mesh-folders')
 
         meshfix_opts = ' -u 10 --vertices {:d} --fsmesh'.format(n_vertices)
         bem_dir = os.path.join(fs_dir, 'bem')
@@ -228,7 +232,7 @@ class SimNIBS(ClusterBatch):
             if not check_source_readable(surf_fname):
                 raise RuntimeError(
                     'Could not find surface {surf:s}; mri2mesh may have exited'
-                    ' with an error, please check.'.format(surf))
+                    ' with an error, please check.'.format(surf=surf))
             bem_fname = os.path.join(bem_dir, bem_layer)
 
             cmds = ['meshfix {sfn:s} {mfo:s} -o {bfn:s}'
