@@ -77,7 +77,11 @@ class SimNIBS(ClusterBatch):
         self.info.update(output_dir=output_dir)
         self.verbose = verbose
 
-    def mri2mesh(self, subject, **kwargs):
+    def mri2mesh(self, subject, t1_fs='*t1*', t2_hb='*t2*',
+                 directives=['brain', 'subcort', 'head'],
+                 analysis_name=None, t2mask=False, t2pial=False,
+                 t1_hb=None, t2_fs=None,
+                 job_options=dict(queue='long.q', n_threads=1)):
         """Build a SimNIBS mri2mesh-command for later execution.
 
         Parameters
@@ -89,23 +93,24 @@ class SimNIBS(ClusterBatch):
             those that are not excluded) in the database.
         t1_fs : str
             The name of the T1-weighted & fat staturation-enabled MR series to
-            use for surface creation.
+            use for surface creation. The name may contain wildcards, such as
+            '*t1*': this will find a series that contains 't1' in its name.
             If the name contains the string '/' or '.nii', it will be treated
             as a Nifti-file. Otherwise, a dicom-to-nifti conversion will be
             performed on the corresponding series in the database.
         t2_hb : str
             The name of the T2-weighted High Bandwidth MR series to
-            use for surface creation.
+            use for surface creation. Same logic applies as for 'tq_fs'.
         directives : str | list of str
             Directives to pass to `mri2mesh`; e.g., 'brain' -> --brain
             Multiple directives may be passed as a list. The default is:
             ['brain', 'subcort', 'head'], which is suitable for BEM creation.
-        analysis_name : str | None
+        analysis_name : str | None (optional)
             Optional suffix to add to subject name (e.g. '_t2mask')
-        t2mask : bool
+        t2mask : boo (optional)
             Tell mri2mesh to use the (high bandwidth) T2 image to mask out
             some dura on the T1 (fs) before running recon-all.
-        t2pial : bool
+        t2pial : bool (optional)
             Tell recon-all to use the T2 image to improve extraction. NB:
             comments in mri2mesh indicate that this only works well when the
             T2 is high-res (ca. 1 mm isotropic). Consider t2mask instead.
@@ -115,11 +120,13 @@ class SimNIBS(ClusterBatch):
         t2_fs : str (optional)
             The name of the T2-weighted & fat staturation-enabled MR series to
             use for surface creation. Optional: may also be defined later.
-        queue : str (optional)
-            Cluster queue to submit the jobs to (default: 'long.q').
-        n_threads : int (optional)
-            Number of parallel CPU cores to request for the job; default is 1.
-            NB: not all queues support multi-threaded execution.
+        job_options : dict
+            Dictionary of optional arguments to pass to ClusterJob. The
+            default set of options is:
+                job_options=dict(queue='long.q', n_threads=1)
+            which sends the job to the cluster queue 'long.q', specifies that
+            a single CPU core should be used (not all queues support multi-
+            threading).
         """
         if isinstance(subject, (list, tuple)):
             self.logger.info('Processing multiple subjects:')
@@ -132,14 +139,16 @@ class SimNIBS(ClusterBatch):
                 subjects = [subject]
         for sub in subjects:
             self.logger.info(sub)
-            self._mri2mesh(sub, **kwargs)
+            self._mri2mesh(sub, t1_fs=t1_fs, t2_hb=t2_hb,
+                           directives=directives, analysis_name=analysis_name,
+                           t2mask=t2mask, t2pial=t2pial, t1_hb=t1_hb,
+                           t2_fs=t2_fs, job_options=job_options)
 
-    def _mri2mesh(self, subject, t1_fs=None, t2_hb=None,
+    def _mri2mesh(self, subject, t1_fs='*t1*', t2_hb='*t2*',
                   directives=['brain', 'subcort', 'head'],
-                  analysis_name=None,
-                  t1_hb=None, t2_fs=None, t2mask=False, t2pial=False,
-                  simnibs_dir='/usr/local/simnibs',
-                  queue='long.q', n_threads=1):
+                  analysis_name=None, t2mask=False, t2pial=False,
+                  t1_hb=None, t2_fs=None,
+                  job_options=dict(queue='long.q', n_threads=1)):
         "Method for single subjects"
 
         if subject not in self.info['valid_subjects']:
@@ -201,7 +210,7 @@ class SimNIBS(ClusterBatch):
         # Build command
         cmd = 'mri2mesh ' + directives_str + ' ' + subject + mr_inputs_str
 
-        self.add_job(cmd, queue=queue, n_threads=n_threads,
+        self.add_job(cmd, **job_options,
                      job_name='mri2mesh', working_dir=self.info['output_dir'])
 
     def create_bem_surfaces(self, subject, n_vertices=5120,
