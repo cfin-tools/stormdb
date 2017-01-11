@@ -166,7 +166,7 @@ class SimNIBS(ClusterBatch):
                 self._joblist = []  # evicerate on error
                 raise
 
-        self.logger.info('{} jobs created Successfully, ready to submit.'
+        self.logger.info('{} jobs created successfully, ready to submit.'
                          .format(len(self._joblist)))
 
     def _mri2mesh(self, subject, t1_fs='*t1*', t2_hb='*t2*',
@@ -190,7 +190,8 @@ class SimNIBS(ClusterBatch):
                     .format(link_to_fs_dir, subject))
             fs_dir, m2m_dir = self._mri2mesh_output_dirs(subject,
                                                          analysis_name)
-            link_cmd = 'ln -s {} {}'.format(fs_dir, link_to_fs_dir)
+            link_name = os.path.join(link_to_fs_dir, subject)
+            link_cmd = 'ln -s {} {}'.format(fs_dir, link_name)
 
         if not isinstance(directives, (string_types, list)):
             raise RuntimeError(
