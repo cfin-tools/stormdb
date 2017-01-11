@@ -209,14 +209,18 @@ class Query(object):
         # Here assuming shell output is in UTF-8
         return(response)
 
-    def get_subjects(self, subj_type='included'):
+    def get_subjects(self, subj_type='included',
+                     has_modality=None, has_series=None):
         """Get list of subjects from database
 
         Parameters
         ----------
         subj_type : str
-            Must be either 'included' or 'excluded'. Returned list is
-            determined by database.
+            Can be 'included' (default), 'excluded' or 'all'.
+        has_modality : str | None
+            Optionally only return subjects that have a specified modality.
+        has_series : str | None
+            Optionally only return subjects that have a specified series.
 
         Returns
         -------
@@ -224,22 +228,56 @@ class Query(object):
             Subject ID codes as returned by the database.
             If no subjects are found, an empty list is returned
         """
-        if subj_type == 'included':
-            scode = 'subjectswithcode'
-        elif subj_type == 'excluded':
-            scode = 'excludedsubjectswithcode'
-        else:
-            raise NameError("""subj_type must be either 'included' or
-                            'excluded'""")
+        if has_modality is not None and has_series is not None:
+            raise ValueError(
+                'You can only specify a modality OR a series, not both.')
 
-        url = scode + '?' + self._login_code + \
-            '&projectCode=' + self.proj_name
+        # using 'subjecs' here would return only numeric ID, not code
+        scode = 'subjectswithcode'
+        if subj_type == 'included':
+            included = 1
+        elif subj_type == 'excluded':
+            included = -1
+        elif subj_type == 'all':
+            included = 0
+        else:
+            raise NameError("subj_type must be 'included', excluded' or 'all'")
+
+        url = ('{scode:s}?{login:s}&projectCode={proj:s}&included={incl:d}'
+               .format(scode=scode, login=self._login_code,
+                       proj=self.proj_name, incl=included))
         output = self._send_request(url)
 
         # Split at '\n'
         subj_list = output.split('\n')
         # Remove any empty entries!
         subj_list = [x for x in subj_list if x]
+
+        if has_modality is not None:
+            all_series = self.filter_series(modalities=has_modality)
+            # get unique subjects that have has_modality and were found above
+            used = []
+            subj_list = [ser['subjectcode'] for ser in all_series if
+                         ser['subjectcode'] not in used and
+                         (used.append(ser['subjectcode']) or True) and
+                         ser['subjectcode'] in subj_list]
+            # The following also works, but is slower?
+            # pop_inds = []
+            # for nsub, sub in enumerate(subj_list):
+            #     studs = self.get_studies(sub, modality=has_modality)
+            #     if len(studs) == 0:
+            #         pop_inds.append(nsub)
+            # pop_inds.reverse()  # prune from back
+            # for pi in pop_inds:
+            #     subj_list.pop(pi)
+
+        if has_series is not None:
+            all_series = self.filter_series(description=has_series)
+            used = []
+            subj_list = [ser['subjectcode'] for ser in all_series if
+                         ser['subjectcode'] not in used and
+                         (used.append(ser['subjectcode']) or True) and
+                         ser['subjectcode'] in subj_list]
 
         return(subj_list)
 
@@ -379,8 +417,8 @@ class Query(object):
 
         return(file_list)
 
-    def filter_series(self, description, subjects=[], modalities=[],
-                      study_metas='', return_files=True):
+    def filter_series(self, description=None, subjects=None, modalities=None,
+                      study_metas=None, return_files=True):
         """Select series based on their description (name)
 
         Get list of series (and corresponding files) from database matching
@@ -389,17 +427,17 @@ class Query(object):
 
         Parameters
         ----------
-        description : str
-            A string containing the name of the series to extract. The
-            asterisk ('*') may be used as a wildcard.
-        subjects : str or list of str
-            A string or list or strings identifying one or more subjects in
-            the database. For example: ['0001_ABC', 0010_XYZ']. An empty string
-            or list ('', default) is equivalent to all non-excluded subjects.
-        modalities : str or list of str
+        description : str | list of str | None
+            A string or list of strings containing the name of the series to
+            extract. The asterisk ('*') may be used as a wildcard. None
+            (default) will match any series description.
+        subjects : str | list of str | None
+            A string or list or strings identifying one or more subject IDs in
+            the database. For example: ['0001_ABC', '0010_XYZ']. None (default)
+            is equivalent to all non-excluded subjects.
+        modalities : str | list of str | None
             A string or list or strings identifying one or more modalities of
-            the study to get. Default: 'MEG', the empty string/list is
-            equivalent to all modalities.
+            the study to get. None is equivalent to all modalities.
         study_metas : dict or None
             A dictionary with fields "name", "comparison" and "value", e.g.,
             dict(name='timepoint', comparison='=', value=2). By default all
@@ -431,25 +469,46 @@ class Query(object):
         outp = ''
         removeProjects = ''
 
+        if isinstance(description, list):
+            try:
+                description_str = '|'.join(description)
+            except TypeError:
+                raise DBError('When using a list of descriptions, each '
+                              'element must be a string.')
+        elif description is None:
+            description_str = ''
+        elif not isinstance(description, string_types):
+            raise DBError('description-parameter must be str or list of str')
+        else:
+            description_str = description
+
         if isinstance(subjects, list):
             try:
-                subjects = '|'.join(subjects)
+                subjects_str = '|'.join(subjects)
             except TypeError:
                 raise DBError('When using a list of subjects, each element '
                               'must be a string.')
+        elif subjects is None:
+            subjects_str = ''
         elif not isinstance(subjects, string_types):
             raise DBError('subjects-parameter must be str or list of str')
+        else:
+            subjects_str = subjects
 
         if isinstance(modalities, list):
             try:
-                modalities = '|'.join(modalities)
+                modalities_str = '|'.join(modalities)
             except TypeError:
                 raise DBError('When using a list of modalities, each element '
                               'must be a string.')
+        elif modalities is None:
+            modalities_str = ''
         elif not isinstance(modalities, string_types):
             raise DBError('modalities-parameter must be str or list of str')
+        else:
+            modalities_str = modalities
 
-        if isinstance(study_metas, dict):
+        if study_metas is not None and isinstance(study_metas, dict):
             # do some checking here...
             try:
                 meta_str += 'studymetas[{:s}]={:s}${:d}&'.\
@@ -466,10 +525,10 @@ class Query(object):
             outp += 'outputoptions[inclfiles]=1&'
 
         url = 'filteredseries?' + self._login_code + '&projectCode=' + \
-              self.proj_name + '&subjects=' + subjects + '&studies=' + \
-              studies + '&modalities=' + modalities + \
+              self.proj_name + '&subjects=' + subjects_str + '&studies=' + \
+              studies + '&modalities=' + modalities_str + \
               '&types=' + types + '&anyWithType=' + anywithtype + \
-              '&description=' + description + '&excluded=' + excluded +\
+              '&description=' + description_str + '&excluded=' + excluded +\
               '&' + meta_str + outp + '&removeProjects=' + removeProjects
         output = self._send_request(url)
 
