@@ -262,9 +262,11 @@ class SimNIBS(ClusterBatch):
 
         Parameters
         ----------
-        subject : str
+        subject : subject ID (str) | list of subject IDs (str) | 'all'
             Name (ID) of subject as a string. Both number and 3-character
-            code must be given.
+            code must be given. Multiple subjects IDs can be passed as a list.
+            The string 'all' is interpreted as all included subjects (i.e.,
+            those that are not excluded) in the database.
         n_vertices : int
             Number of vertices to subsample the high-resolution surfaces to
             (default: 5120).
@@ -274,6 +276,32 @@ class SimNIBS(ClusterBatch):
             Dictionary of optional arguments to pass to ClusterJob. The
             default set here is: job_options=dict(queue='short.q', n_threads=1)
         """
+        if isinstance(subject, (list, tuple)):
+            self.logger.info('Processing multiple subjects:')
+            subjects = subject
+        elif isinstance(subject, string_types):
+            if subject == 'all':
+                self.logger.info('Processing all included subjects:')
+                subjects = self.info['valid_subjects']
+            else:
+                subjects = [subject]
+        for sub in subjects:
+            self.logger.info(sub)
+            try:
+                self._create_bem_surfaces(sub, n_vertices=n_vertices,
+                                          analysis_name=analysis_name,
+                                          job_options=job_options)
+            except:
+                self._joblist = []  # evicerate on error
+                raise
+
+        self.logger.info('{} jobs created successfully, ready to submit.'
+                         .format(len(self._joblist)))
+
+    def _create_bem_surfaces(self, subject, n_vertices=5120,
+                             analysis_name=None,
+                             job_options=dict(queue='short.q', n_threads=1)):
+        "Create BEMs for single subject."
         if subject not in self.info['valid_subjects']:
             raise RuntimeError(
                 'Subject {0} not found in database!'.format(subject))
