@@ -67,7 +67,8 @@ class SimNIBS(ClusterBatch):
     Attributes
     ----------
     info : dict
-        See `SimNIBS().info.keys()` for contents.
+        'valid_subjects': list of subjects with MR-modality
+        'output_dir': SimNIBS output directory
     """
     def __init__(self, proj_name=None, output_dir=None, verbose=False):
         super(SimNIBS, self).__init__(proj_name, verbose=verbose)
@@ -86,8 +87,13 @@ class SimNIBS(ClusterBatch):
 
         enforce_path_exists(output_dir)
 
-        self.info = dict(valid_subjects=Query(proj_name).get_subjects())
-        self.info.update(output_dir=output_dir)
+        valid_subjects = Query(proj_name).get_subjects(has_modality='MR')
+        if len(valid_subjects) == 0:
+            raise RuntimeError(
+                'No subjects with MR-modality found in {}!'
+                .format(self.proj_name))
+        self.info = dict(valid_subjects=valid_subjects,
+                         output_dir=output_dir)
         self.verbose = verbose
 
     def mri2mesh(self, subject, t1_fs='*t1*', t2_hb='*t2*',
