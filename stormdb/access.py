@@ -231,6 +231,14 @@ class Query(object):
         if has_modality is not None and has_series is not None:
             raise ValueError(
                 'You can only specify a modality OR a series, not both.')
+        type_err = '{} must be a string, not {}.'
+        if (has_modality is not None and
+                not isinstance(has_modality, string_types)):
+            raise ValueError(type_err.format('has_modality',
+                                             type(has_modality)))
+        if (has_series is not None and
+                not isinstance(has_series, string_types)):
+            raise ValueError(type_err.format('has_series', type(has_series)))
 
         # using 'subjecs' here would return only numeric ID, not code
         scode = 'subjectswithcode'
