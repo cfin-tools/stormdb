@@ -36,7 +36,8 @@ class SimNIBS(ClusterBatch):
     based on a fat-saturated T1 and high bandwidth T2 (note use of wildcards)
         >>> from stormdb.process import SimNIBS  # doctest: +SKIP
         >>> sn = SimNIBS(output_dir='scratch/sn_subjects_dir')  # doctest: +SKIP
-        >>> sn.mri2mesh('0002_M55', t1_fs='*t1*FS', t2_hb='*t2*H*')  # doctest: +SKIP
+        >>> sn.mri2mesh('0002_M55', t1_fs='*t1*FS',
+                        t2_hb='*t2*H*')  # doctest: +SKIP
         >>> sn.submit()  # doctest: +SKIP
 
     Example 2: Once the meshes have been calculated, convert them to lower-
@@ -188,10 +189,9 @@ class SimNIBS(ClusterBatch):
                     'The directory {} already contains the subject-folder {}.'
                     '\nYou must manually (re)move it before proceeding.'
                     .format(link_to_fs_dir, subject))
-            fs_dir, m2m_dir = self._mri2mesh_output_dirs(subject,
-                                                         analysis_name)
-            link_name = os.path.join(link_to_fs_dir, subject)
-            link_cmd = 'ln -s {} {}'.format(fs_dir, link_name)
+            m2m_outputs = self._mri2mesh_outputs(subject, analysis_name)
+            link_name = os.path.join(link_to_fs_dir, m2m_outputs['subject'])
+            link_cmd = 'ln -s {} {}'.format(m2m_outputs['fs_dir'], link_name)
 
         if not isinstance(directives, (string_types, list)):
             raise RuntimeError(
@@ -278,10 +278,10 @@ class SimNIBS(ClusterBatch):
             raise RuntimeError(
                 'Subject {0} not found in database!'.format(subject))
 
-        fs_dir, m2m_dir = self._mri2mesh_output_dirs(subject, analysis_name)
+        m2m_outputs = self._mri2mesh_outputs(subject, analysis_name)
         try:
-            enforce_path_exists(fs_dir)
-            enforce_path_exists(m2m_dir)
+            enforce_path_exists(m2m_outputs['fs_dir'])
+            enforce_path_exists(m2m_outputs['m2m_dir'])
         except IOError as m2m_err:
             msg = ('{0}\nFailed to find accessible mri2mesh-folders; '
                    'did it complete successfully?'.format(m2m_err))
@@ -291,12 +291,12 @@ class SimNIBS(ClusterBatch):
             raise RuntimeError(msg)
 
         meshfix_opts = ' -u 10 --vertices {:d} --fsmesh'.format(n_vertices)
-        bem_dir = os.path.join(fs_dir, 'bem')
+        bem_dir = os.path.join(m2m_outputs['fs_dir'], 'bem')
         bem_surfaces = dict(inner_skull='csf.stl',
                             outer_skull='skull.stl',
                             outer_skin='skin.stl')
         for bem_layer, surf in bem_surfaces.items():
-            surf_fname = os.path.join(m2m_dir, surf)
+            surf_fname = os.path.join(m2m_outputs['m2m_dir'], surf)
             if not check_source_readable(surf_fname):
                 raise RuntimeError(
                     'Could not find surface {surf:s}; mri2mesh may have exited'
@@ -306,8 +306,9 @@ class SimNIBS(ClusterBatch):
             cmds = ['meshfix {sfn:s} {mfo:s} -o {bfn:s}'
                     .format(sfn=surf_fname, mfo=meshfix_opts, bfn=bem_fname)]
 
-            xfm_volume = os.path.join(m2m_dir, 'tmp', 'subcortical_FS.nii.gz')
-            xfm = os.path.join(m2m_dir, 'tmp', 'unity.xfm')
+            xfm_volume = os.path.join(m2m_outputs['m2m_dir'], 'tmp',
+                                      'subcortical_FS.nii.gz')
+            xfm = os.path.join(m2m_outputs['m2m_dir'], 'tmp', 'unity.xfm')
 
             # NB This is needed! Otherwise the stl->fsmesh conversion output
             # lacks some transformation and is misaligned with the MR
@@ -321,7 +322,7 @@ class SimNIBS(ClusterBatch):
                      working_dir=self.info['output_dir'],
                      **job_options)
 
-    def _mri2mesh_output_dirs(self, subject, analysis_name):
+    def _mri2mesh_outputs(self, subject, analysis_name):
         if analysis_name is not None:
             suffix = analysis_name
         else:
@@ -331,8 +332,9 @@ class SimNIBS(ClusterBatch):
                               'fs_' + subject + suffix)
         m2m_dir = os.path.join(self.info['output_dir'],
                                'm2m_' + subject + suffix)
+        m2m_subject = subject + suffix
 
-        return fs_dir, m2m_dir
+        return dict(subject=m2m_subject, fs_dir=fs_dir, m2m_dir=m2m_dir)
 
     def _get_absolute_path(self, output_dir):
         if not output_dir.startswith('/'):
