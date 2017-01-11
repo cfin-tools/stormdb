@@ -14,7 +14,7 @@ from six import string_types
 from warnings import warn
 from .utils import convert_dicom_to_nifti
 from ..base import (enforce_path_exists, check_source_readable,
-                    parse_arguments, _get_unique_series, mkdir_p)
+                    _get_unique_series, mkdir_p)
 from ..access import Query
 from ..cluster import ClusterBatch
 
@@ -31,6 +31,21 @@ class SimNIBS(ClusterBatch):
     It's therefore best to let `mri2mesh` deal with cortex extraction. If you
     want the non-modified Freesurfer-approach, see
     :class:`.freesurfer.Freesurfer` for details.
+
+    Example 1: Create the meshes required for source space analysis of MEG,
+    based on a fat-saturated T1 and high bandwidth T2 (note use of wildcards)
+        >>> from stormdb.process import SimNIBS  # doctest: +SKIP
+        >>> sn = SimNIBS(output_dir='scratch/sn_subjects_dir')  # doctest: +SKIP
+        >>> sn.mri2mesh('0002_M55', t1_fs='*t1*FS', t2_hb='*t2*H*')  # doctest: +SKIP
+        >>> sn.submit()  # doctest: +SKIP
+
+    Example 2: Once the meshes have been calculated, convert them to lower-
+    resolution surfaces suitable for BEM-based forward modeling
+        >>> from stormdb.process import SimNIBS  # doctest: +SKIP
+        >>> sn = SimNIBS(output_dir='scratch/sn_subjects_dir')  # doctest: +SKIP
+        >>> sn.create_bem_surfaces('0002_M55', t1_fs='*t1*FS',
+                                   t2_hb='*t2*H*')  # doctest: +SKIP
+        >>> sn.submit()  # doctest: +SKIP
 
     Parameters
     ----------
@@ -80,7 +95,7 @@ class SimNIBS(ClusterBatch):
     def mri2mesh(self, subject, t1_fs='*t1*', t2_hb='*t2*',
                  directives=['brain', 'subcort', 'head'],
                  analysis_name=None, t2mask=False, t2pial=False,
-                 t1_hb=None, t2_fs=None,
+                 t1_hb=None, t2_fs=None, link_to_fs_dir=None,
                  job_options=dict(queue='long.q', n_threads=1)):
         """Build a SimNIBS mri2mesh-command for later execution.
 
@@ -120,6 +135,10 @@ class SimNIBS(ClusterBatch):
         t2_fs : str (optional)
             The name of the T2-weighted & fat staturation-enabled MR series to
             use for surface creation. Optional: may also be defined later.
+        link_to_fs_dir : str | None (optional)
+            Optionally specify a path into which the Freesurfer-reconstructions
+            will be linked to (default: None). This is recommended for MNE
+            and mne-python users, as those tools assume this structure.
         job_options : dict
             Dictionary of optional arguments to pass to ClusterJob. The
             default set of options is:
@@ -139,21 +158,38 @@ class SimNIBS(ClusterBatch):
                 subjects = [subject]
         for sub in subjects:
             self.logger.info(sub)
-            self._mri2mesh(sub, t1_fs=t1_fs, t2_hb=t2_hb,
-                           directives=directives, analysis_name=analysis_name,
-                           t2mask=t2mask, t2pial=t2pial, t1_hb=t1_hb,
-                           t2_fs=t2_fs, job_options=job_options)
+            try:
+                self._mri2mesh(sub, t1_fs=t1_fs, t2_hb=t2_hb,
+                               directives=directives,
+                               analysis_name=analysis_name,
+                               t2mask=t2mask, t2pial=t2pial, t1_hb=t1_hb,
+                               t2_fs=t2_fs, link_to_fs_dir=link_to_fs_dir,
+                               job_options=job_options)
+            except:
+                self._joblist = []  # evicerate on error
+                raise
 
     def _mri2mesh(self, subject, t1_fs='*t1*', t2_hb='*t2*',
                   directives=['brain', 'subcort', 'head'],
                   analysis_name=None, t2mask=False, t2pial=False,
-                  t1_hb=None, t2_fs=None,
+                  t1_hb=None, t2_fs=None, link_to_fs_dir=None,
                   job_options=dict(queue='long.q', n_threads=1)):
         "Method for single subjects"
 
         if subject not in self.info['valid_subjects']:
             raise RuntimeError(
                 'Subject {0} not found in database!'.format(subject))
+
+        if isinstance(link_to_fs_dir, string_types):
+            enforce_path_exists(link_to_fs_dir)
+            if os.path.exists(os.path.join(link_to_fs_dir, subject)):
+                raise RuntimeError(
+                    'The directory {} already contains the subject-folder {}.'
+                    '\nYou must manually (re)move it before proceeding.'
+                    .format(link_to_fs_dir, subject))
+            fs_dir, m2m_dir = self._mri2mesh_output_dirs(subject,
+                                                         analysis_name)
+            link_cmd = 'ln -s {} {}'.format(fs_dir, link_to_fs_dir)
 
         if not isinstance(directives, (string_types, list)):
             raise RuntimeError(
@@ -209,14 +245,17 @@ class SimNIBS(ClusterBatch):
             subject += analysis_name
 
         # Build command
-        cmd = 'mri2mesh ' + directives_str + ' ' + subject + mr_inputs_str
+        cmd = ['mri2mesh ' + directives_str + ' ' + subject + mr_inputs_str]
+
+        if link_to_fs_dir is not None:
+            cmd += [link_cmd]
 
         self.add_job(cmd, working_dir=self.info['output_dir'],
                      job_name='mri2mesh', **job_options)
 
     def create_bem_surfaces(self, subject, n_vertices=5120,
-                            analysis_name=None, queue='short.q',
-                            n_threads=1):
+                            analysis_name=None,
+                            job_options=dict(queue='short.q', n_threads=1)):
         """Convert mri2mesh output to Freesurfer meshes suitable for BEMs.
 
         Parameters
@@ -229,27 +268,22 @@ class SimNIBS(ClusterBatch):
             (default: 5120).
         analysis_name : str | None
             Optional suffix to add to subject name (e.g. '_with_t2mask')
+        job_options : dict
+            Dictionary of optional arguments to pass to ClusterJob. The
+            default set here is: job_options=dict(queue='short.q', n_threads=1)
         """
         if subject not in self.info['valid_subjects']:
             raise RuntimeError(
                 'Subject {0} not found in database!'.format(subject))
 
-        if analysis_name is not None:
-            suffix = analysis_name
-        else:
-            suffix = ''
-
-        fs_dir = os.path.join(self.info['output_dir'],
-                              'fs_' + subject + suffix)
-        m2m_dir = os.path.join(self.info['output_dir'],
-                               'm2m_' + subject + suffix)
+        fs_dir, m2m_dir = self._mri2mesh_output_dirs(subject, analysis_name)
         try:
             enforce_path_exists(fs_dir)
             enforce_path_exists(m2m_dir)
         except IOError as m2m_err:
             msg = ('{0}\nFailed to find accessible mri2mesh-folders; '
                    'did it complete successfully?'.format(m2m_err))
-            if len(suffix) > 0:
+            if isinstance(analysis_name, string_types):
                 msg += ('\nPlease also check that the analysis_name is '
                         'correct: {0}'.format(analysis_name))
             raise RuntimeError(msg)
@@ -273,89 +307,27 @@ class SimNIBS(ClusterBatch):
             xfm_volume = os.path.join(m2m_dir, 'tmp', 'subcortical_FS.nii.gz')
             xfm = os.path.join(m2m_dir, 'tmp', 'unity.xfm')
 
+            # NB This is needed! Otherwise the stl->fsmesh conversion output
+            # lacks some transformation and is misaligned with the MR
             cmds += ['mris_transform --dst {xv:s} --src {xv:s} '
                      '{bfn:s}.fsmesh {xfm:s} {bfn:s}.surf'
                      .format(xv=xfm_volume, bfn=bem_fname, xfm=xfm)]
             cmds += ['rm {bfn:s}.fsmesh'.format(bfn=bem_fname)]
 
-            cmd = ';'.join(cmds)
-            self.add_job(cmd, queue=queue, n_threads=n_threads,
-                         job_name='meshfix',
-                         working_dir=self.info['output_dir'])
+        # One job per subject, since these are "cheap" operations
+        self.add_job(cmds, job_name='meshfix',
+                     working_dir=self.info['output_dir'],
+                     **job_options)
 
-# def make_symbolic_links(subject, subjects_dir):
-#     """Make symblic links between FS dir and subjects_dir.
-#     Parameters
-#     ----------
-#     fname : string
-#         The name of the subject to create for
-#     subjects_dir : string
-#         The subjects dir for FreeSurfer
-#     """
-#
-#     make_links = "ln -s fs_%s/* ." % subject[:4]
-#     os.chdir(fs_subjects_dir + subject[:4])
-#     subprocess.call([cmd, "1", make_links])
-#
-#
-# def convert_surfaces(subject, subjects_dir):
-#     """Convert the SimNIBS surface to FreeSurfer surfaces.
-#     Parameters
-#     ----------
-#     subject : string
-#        The name of the subject
-#     subjects_dir : string
-#         The subjects dir for FreeSurfer
-#     """
-#     convert_csf = "meshfix csf.stl -u 10 --vertices 4098 --fsmesh"
-#     convert_skull = "meshfix skull.stl -u 10 --vertices 4098 --fsmesh"
-#     convert_skin = "meshfix skin.stl -u 10 --vertices 4098 --fsmesh"
-#
-#     os.chdir(fs_subjects_dir + subject[:4] + "/m2m_%s" % subject[:4])
-#     subprocess.call([cmd, "1", convert_csf])
-#     subprocess.call([cmd, "1", convert_skull])
-#     subprocess.call([cmd, "1", convert_skin])
-#
-#
-# def copy_surfaces(subject, subjects_dir):
-#     """Copy the converted FreeSurfer surfaces to the bem dir.
-#     Parameters
-#     ----------
-#     subject : string
-#        The name of the subject
-#     subjects_dir : string
-#         The subjects dir for FreeSurfer
-#     """
-#     os.chdir(fs_subjects_dir + subject[:4] + "/m2m_%s" % subject[:4])
-#     copy_inner_skull = "cp -f csf_fixed.fsmesh " + subjects_dir + \
-#                        "/%s/bem/inner_skull.surf" % subject[:4]
-#     copy_outer_skull = "cp -f skull_fixed.fsmesh " + subjects_dir + \
-#                        "/%s/bem/outer_skull.surf" % subject[:4]
-#     copy_outer_skin = "cp -f skin_fixed.fsmesh " + subjects_dir + \
-#                        "/%s/bem/outer_skin.surf" % subject[:4]
-#
-#     subprocess.call([cmd, "1", copy_inner_skull])
-#     subprocess.call([cmd, "1", copy_outer_skull])
-#     subprocess.call([cmd, "1", copy_outer_skin])
-#
-#     os.chdir(fs_subjects_dir + subject[:4] + "/bem")
-#     convert_skin_to_head = "mne_surf2bem --surf outer_skin.surf --fif %s-head.fif --id 4" % subject[:4]
-#     subprocess.call([cmd, "1", convert_skin_to_head])
-#
-#
-# def setup_mne_c_forward(subject):
-#     setup_forward = "mne_setup_forward_model --subject %s --surf --ico -6" %subject[:4]
-#     subprocess.call([cmd, "1", setup_forward])
-#
-#
-# for subject in included_subjects[3:5]:
-#     make_symbolic_links(subject, fs_subjects_dir)
-#
-# for subject in included_subjects[3:5]:
-#     convert_surfaces(subject, fs_subjects_dir)
-#
-# for subject in included_subjects[3:5]:
-#     copy_surfaces(subject, fs_subjects_dir)
-#
-# for subject in included_subjects[3:5]:
-#     setup_mne_c_forward(subject)
+    def _mri2mesh_output_dirs(self, subject, analysis_name):
+        if analysis_name is not None:
+            suffix = analysis_name
+        else:
+            suffix = ''
+
+        fs_dir = os.path.join(self.info['output_dir'],
+                              'fs_' + subject + suffix)
+        m2m_dir = os.path.join(self.info['output_dir'],
+                               'm2m_' + subject + suffix)
+
+        return fs_dir, m2m_dir
