@@ -81,10 +81,7 @@ class SimNIBS(ClusterBatch):
                     'SN_SUBJECT_DIR environment variable. The directory must '
                     'exist.')
         else:
-            if not output_dir.startswith('/'):
-                # the path can be _relative_ to the project dir
-                output_dir = os.path.join('/projects', self.proj_name,
-                                          output_dir)
+            output_dir = self._get_absolute_path(output_dir)
 
         enforce_path_exists(output_dir)
 
@@ -169,6 +166,9 @@ class SimNIBS(ClusterBatch):
                 self._joblist = []  # evicerate on error
                 raise
 
+        self.logger.info('{} jobs created Successfully, ready to submit.'
+                         .format(len(self._joblist)))
+
     def _mri2mesh(self, subject, t1_fs='*t1*', t2_hb='*t2*',
                   directives=['brain', 'subcort', 'head'],
                   analysis_name=None, t2mask=False, t2pial=False,
@@ -181,6 +181,7 @@ class SimNIBS(ClusterBatch):
                 'Subject {0} not found in database!'.format(subject))
 
         if isinstance(link_to_fs_dir, string_types):
+            link_to_fs_dir = self._get_absolute_path(link_to_fs_dir)
             enforce_path_exists(link_to_fs_dir)
             if os.path.exists(os.path.join(link_to_fs_dir, subject)):
                 raise RuntimeError(
@@ -331,3 +332,10 @@ class SimNIBS(ClusterBatch):
                                'm2m_' + subject + suffix)
 
         return fs_dir, m2m_dir
+
+    def _get_absolute_path(self, output_dir):
+        if not output_dir.startswith('/'):
+            # the path can be _relative_ to the project dir
+            output_dir = os.path.join('/projects', self.proj_name,
+                                      output_dir)
+        return output_dir
