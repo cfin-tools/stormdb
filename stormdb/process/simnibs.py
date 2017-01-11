@@ -184,6 +184,7 @@ class SimNIBS(ClusterBatch):
                 nii_path = os.path.join(self.info['output_dir'], 'nifti',
                                         subject)
                 mkdir_p(nii_path)
+                mri = series[0]['seriename']  # in case wildcards were used
                 mri = os.path.join(nii_path, mri + '.nii.gz')
                 if not os.path.isfile(mri):  # if exists, don't redo!
                     self.logger.info('Converting DICOM to Nifti, this will '
@@ -210,8 +211,8 @@ class SimNIBS(ClusterBatch):
         # Build command
         cmd = 'mri2mesh ' + directives_str + ' ' + subject + mr_inputs_str
 
-        self.add_job(cmd, **job_options,
-                     job_name='mri2mesh', working_dir=self.info['output_dir'])
+        self.add_job(cmd, working_dir=self.info['output_dir'],
+                     job_name='mri2mesh', **job_options)
 
     def create_bem_surfaces(self, subject, n_vertices=5120,
                             analysis_name=None, queue='short.q',
