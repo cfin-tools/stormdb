@@ -50,9 +50,6 @@ class Freesurfer(ClusterBatch):
                  verbose=False):
         super(Freesurfer, self).__init__(proj_name, verbose=verbose)
 
-        self.verbose = verbose
-        self.info = dict(valid_subjects=Query(proj_name).get_subjects())
-
         if subjects_dir is None:
             if 'SUBJECTS_DIR' in os.environ.keys():
                 subjects_dir = os.environ['SUBJECTS_DIR']
@@ -68,24 +65,36 @@ class Freesurfer(ClusterBatch):
                                             subjects_dir)
 
         enforce_path_exists(subjects_dir)
-        self.info.update(subjects_dir=subjects_dir)
+
+        valid_subjects = Query(proj_name).get_subjects(has_modality='MR')
+        if len(valid_subjects) == 0:
+            raise RuntimeError(
+                'No subjects with MR-modality found in {}!'
+                .format(self.proj_name))
+
+        self.info = dict(valid_subjects=valid_subjects,
+                         subjects_dir=subjects_dir)
 
         if t1_series is not None:
             self.info.update(t1_series=t1_series)
 
+        self.verbose = verbose
+
         # Consider placing other vars here
 
     def recon_all(self, subject, t1_series=None, hemi='both',
-                  directive='all', analysis_name=None,
+                  directives='all', analysis_name=None,
                   job_options=dict(queue='long.q', n_threads=1)):
         """Build a Freesurfer recon-all command for later execution.
 
         Parameters
         ----------
-        subject : str
+        subject : subject ID (str) | list of subject IDs (str) | 'all'
             Name (ID) of subject as a string. Both number and 3-character
-            code must be given.
-        directive : str | list or str
+            code must be given. Multiple subjects IDs can be passed as a list.
+            The string 'all' is interpreted as all included subjects (i.e.,
+            those that are not excluded) in the database.
+        directives : str | list or str
             The tasks for recon-all to run; defaults to 'all'. Run
             `recon-all -help` for list of options. Multiple options can be
             specified as a list of strings.
@@ -106,12 +115,42 @@ class Freesurfer(ClusterBatch):
             a single CPU core should be used (not all queues support multi-
             threading).
         """
-        if isinstance(directive, string_types):
-            directives = [directive]
-        elif not isinstance(directive, (list, tuple)):
-            raise ValueError('Directive must be string or list of strings.')
-        else:
-            directives = directive[:]  # copy!
+        if isinstance(subject, (list, tuple)):
+            self.logger.info('Processing multiple subjects:')
+            subjects = subject
+        elif isinstance(subject, string_types):
+            if subject == 'all':
+                self.logger.info('Processing all included subjects:')
+                subjects = self.info['valid_subjects']
+            else:
+                subjects = [subject]
+
+        if not isinstance(directives, (string_types, list)):
+            raise RuntimeError(
+                'Directives should be str or list of str, not '
+                '{0}'.format(type(directives)))
+        # This has the dual effect of: i) making a list out of a string, and
+        # ii) COPYING the directives-list to another one
+        recon_all_flags = list(directives)
+
+        for sub in subjects:
+            self.logger.info(sub)
+            try:
+                self._recon_all(sub, directives=recon_all_flags,
+                                hemi=hemi, t1_series=t1_series,
+                                analysis_name=analysis_name,
+                                job_options=job_options)
+            except:
+                self._joblist = []  # evicerate on error
+                raise
+
+        self.logger.info('{} jobs created successfully, ready to submit.'
+                         .format(len(self._joblist)))
+
+    def _recon_all(self, subject, t1_series=None, hemi='both',
+                   directives='all', analysis_name=None,
+                   job_options=dict(queue='long.q', n_threads=1)):
+        "Method for single subjects"
 
         if subject not in self.info['valid_subjects']:
             raise RuntimeError(
@@ -161,42 +200,42 @@ class Freesurfer(ClusterBatch):
         cmd += ' -{}'.format(' -'.join(directives))
         self.add_job(cmd, job_name='recon-all', **job_options)
 
-    def apply_to_subjects(self, subjects='all', method='recon_all',
-                          method_args=None):
-        """Apply a Freesufer-method to a list of subjects.
-
-        Parameters
-        ----------
-        subjects : list of str | str
-            List of subjects to loop over. If 'all', all included subjects are
-            selected from the database (default).
-        method : str
-            Name of Freesurfer-method to apply. Default: 'recon_all'
-        method_args : dict | None
-            Dictionary of argument value-pairs to pass on to method. If None,
-            default values of the method are used.
-        """
-        if isinstance(subjects, string_types) and subjects == 'all':
-            subjects = self.info['valid_subjects']
-        elif not isinstance(subjects, (list, tuple)):
-            raise ValueError("Specify either list of subjects, or 'all'.")
-        args, kwargs = parse_arguments(eval('self.' + method))
-
-        for sub in subjects:
-            if not isinstance(sub, string_types):
-                raise ValueError('Each subject name must be given as string.')
-            cmd = 'self.' + method + "('{0}'".format(sub)
-            for k, v in kwargs.iteritems():
-                if method_args is not None and k in method_args.keys():
-                    v = method_args[k]
-
-                if isinstance(v, string_types):
-                    cmd += ", {0}='{1}'".format(k, v)
-                else:
-                    cmd += ', {0}={1}'.format(k, v)
-
-            cmd += ')'
-            eval(cmd)
-
-        self.logger.info(
-            'Successfully prepared {0} jobs.'.format(len(subjects)))
+    # def apply_to_subjects(self, subjects='all', method='recon_all',
+    #                       method_args=None):
+    #     """Apply a Freesufer-method to a list of subjects.
+    #
+    #     Parameters
+    #     ----------
+    #     subjects : list of str | str
+    #         List of subjects to loop over. If 'all', all included subjects are
+    #         selected from the database (default).
+    #     method : str
+    #         Name of Freesurfer-method to apply. Default: 'recon_all'
+    #     method_args : dict | None
+    #         Dictionary of argument value-pairs to pass on to method. If None,
+    #         default values of the method are used.
+    #     """
+    #     if isinstance(subjects, string_types) and subjects == 'all':
+    #         subjects = self.info['valid_subjects']
+    #     elif not isinstance(subjects, (list, tuple)):
+    #         raise ValueError("Specify either list of subjects, or 'all'.")
+    #     args, kwargs = parse_arguments(eval('self.' + method))
+    #
+    #     for sub in subjects:
+    #         if not isinstance(sub, string_types):
+    #             raise ValueError('Each subject name must be given as string.')
+    #         cmd = 'self.' + method + "('{0}'".format(sub)
+    #         for k, v in kwargs.iteritems():
+    #             if method_args is not None and k in method_args.keys():
+    #                 v = method_args[k]
+    #
+    #             if isinstance(v, string_types):
+    #                 cmd += ", {0}='{1}'".format(k, v)
+    #             else:
+    #                 cmd += ', {0}={1}'.format(k, v)
+    #
+    #         cmd += ')'
+    #         eval(cmd)
+    #
+    #     self.logger.info(
+    #         'Successfully prepared {0} jobs.'.format(len(subjects)))
