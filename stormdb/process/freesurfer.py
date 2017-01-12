@@ -169,15 +169,15 @@ class Freesurfer(ClusterBatch):
         # has DICOM conversion been performed?
         if not os.path.exists(cur_subj_dir) or not check_source_readable(
                 os.path.join(cur_subj_dir, 'mri', 'orig', '001.mgz')):
-            self.logger.info('Initialising freesurfer folder structure and '
-                             'converting DICOM files; this should take about '
-                             '15 seconds...')
             if t1_series is None:
                 if 't1_series' not in self.info.keys():
                     raise RuntimeError('Name of T1 series must be defined!')
                 else:
                     t1_series = self.info['t1_series']
 
+            self.logger.info('Initialising freesurfer folder structure and '
+                             'converting DICOM files; this should take about '
+                             '15 seconds...')
             series = _get_unique_series(Query(self.proj_name), t1_series,
                                         subject, 'MR')
             tmpdir = make_copy_of_dicom_dir(series[0]['path'])
