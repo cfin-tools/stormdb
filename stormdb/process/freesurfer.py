@@ -116,10 +116,11 @@ class Freesurfer(ClusterBatch):
         if subject not in self.info['valid_subjects']:
             raise RuntimeError(
                 'Subject {0} not found in database!'.format(subject))
-            if analysis_name is not None:
-                if not isinstance(analysis_name, string_types):
-                    raise ValueError('Analysis name suffix must be a string.')
-                subject += analysis_name
+
+        if analysis_name is not None:
+            if not isinstance(analysis_name, string_types):
+                raise ValueError('Analysis name suffix must be a string.')
+            subject += analysis_name
         cur_subj_dir = os.path.join(self.info['subjects_dir'], subject)
 
         # Build command, force subjects_dir on cluster nodes
