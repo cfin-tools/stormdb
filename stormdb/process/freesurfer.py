@@ -64,7 +64,7 @@ class Freesurfer(ClusterBatch):
         else:
             if not subjects_dir.startswith('/'):
                 # the path can be _relative_ to the project dir
-                subjects_dir = os.path.join('/projects', proj_name,
+                subjects_dir = os.path.join('/projects', self.proj_name,
                                             subjects_dir)
 
         enforce_path_exists(subjects_dir)
