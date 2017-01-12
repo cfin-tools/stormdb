@@ -76,8 +76,8 @@ class Freesurfer(ClusterBatch):
         # Consider placing other vars here
 
     def recon_all(self, subject, t1_series=None, hemi='both',
-                  directive='all', queue='long.q', n_threads=1,
-                  recon_bin='/usr/local/freesurfer/bin/recon-all'):
+                  directive='all', analysis_name=None,
+                  job_options=dict(queue='long.q', n_threads=1)):
         """Build a Freesurfer recon-all command for later execution.
 
         Parameters
@@ -94,15 +94,17 @@ class Freesurfer(ClusterBatch):
             This parameter is optional, it only has an effect when running
             recon-all for the first time (mri_convert from DICOM to mgz). If
             None, the value given at object creation time will be used.
+        analysis_name : str | None (optional)
+            Optional suffix to add to subject name (e.g. '_t2mask')
         hemi : str (optional)
             Defaults to 'both'. You may also specify either 'lh' or 'rh'.
-        queue : str (optional)
-            Cluster queue to submit the jobs to (default: 'long.q').
-        n_threads : int (optional)
-            Number of parallel CPU cores to request for the job; default is 1.
-            NB: not all queues support multi-threaded execution.
-        recon_bin : str (optional)
-            Path to `recon-all` executable.
+        job_options : dict
+            Dictionary of optional arguments to pass to ClusterJob. The
+            default set of options is:
+                job_options=dict(queue='long.q', n_threads=1)
+            which sends the job to the cluster queue 'long.q', specifies that
+            a single CPU core should be used (not all queues support multi-
+            threading).
         """
         if isinstance(directive, string_types):
             directives = [directive]
@@ -114,15 +116,22 @@ class Freesurfer(ClusterBatch):
         if subject not in self.info['valid_subjects']:
             raise RuntimeError(
                 'Subject {0} not found in database!'.format(subject))
+            if analysis_name is not None:
+                if not isinstance(analysis_name, string_types):
+                    raise ValueError('Analysis name suffix must be a string.')
+                subject += analysis_name
         cur_subj_dir = os.path.join(self.info['subjects_dir'], subject)
 
         # Build command, force subjects_dir on cluster nodes
-        cmd = (recon_bin + ' -subjid {}'.format(subject) +
+        cmd = ('recon-all -subjid {}'.format(subject) +
                ' -sd {}'.format(self.info['subjects_dir']))
 
         # has DICOM conversion been performed?
         if not os.path.exists(cur_subj_dir) or not check_source_readable(
                 os.path.join(cur_subj_dir, 'mri', 'orig', '001.mgz')):
+            self.logger.info('Initialising freesurfer folder structure and '
+                             'converting DICOM files; this should take about '
+                             '15 seconds...')
             if t1_series is None:
                 if 't1_series' not in self.info.keys():
                     raise RuntimeError('Name of T1 series must be defined!')
@@ -141,6 +150,7 @@ class Freesurfer(ClusterBatch):
                                    '{:s}'.format(cpe.returncode, cpe.output))
             finally:
                 shutil.rmtree(tmpdir)
+            self.logger.info('...done.')
 
         if hemi != 'both':
             if hemi not in ['lh', 'rh']:
@@ -148,8 +158,7 @@ class Freesurfer(ClusterBatch):
             cmd += ' -hemi {0}'.format(hemi)
 
         cmd += ' -{}'.format(' -'.join(directives))
-        self.add_job(cmd, queue=queue, n_threads=n_threads,
-                     job_name='recon-all')
+        self.add_job(cmd, job_name='recon-all', **job_options)
 
     def apply_to_subjects(self, subjects='all', method='recon_all',
                           method_args=None):
