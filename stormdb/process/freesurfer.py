@@ -15,13 +15,24 @@ from six import string_types
 
 from .utils import first_file_in_dir, make_copy_of_dicom_dir
 from ..base import (enforce_path_exists, check_source_readable,
-                    parse_arguments, _get_unique_series)
+                    _get_unique_series)
 from ..access import Query
 from ..cluster import ClusterBatch
 
 
 class Freesurfer(ClusterBatch):
     """ Object for running Freesurfer in the StormDB environment
+
+    Example 1: Run `recon-all -all` on all subjects in the database that
+    include a study with an MR-modality present. Ensure that each subject
+    has an MR-series matching the wildcard '*t1*mpr*'. Also use the default
+    option '-3T' for non-uniformity correction at 3T. The jobs will be
+    submitted to 'long.q' and run on 1 thread per job (defaults).
+        >>> from stormdb.process import Freesurfer  # doctest: +SKIP
+        >>> fs = Freesurfer(subjects_dir='scratch/fs_subjects_dir',
+                            t1_series='*t1*mpr*')  # doctest: +SKIP
+        >>> fs.recon_all('all')  # doctest: +SKIP
+        >>> fs.submit()  # doctest: +SKIP
 
     Parameters
     ----------
@@ -83,7 +94,7 @@ class Freesurfer(ClusterBatch):
         # Consider placing other vars here
 
     def recon_all(self, subject, t1_series=None, hemi='both',
-                  directives='all', analysis_name=None,
+                  directives=['all', '3T'], analysis_name=None,
                   job_options=dict(queue='long.q', n_threads=1)):
         """Build a Freesurfer recon-all command for later execution.
 
@@ -95,9 +106,12 @@ class Freesurfer(ClusterBatch):
             The string 'all' is interpreted as all included subjects (i.e.,
             those that are not excluded) in the database.
         directives : str | list or str
-            The tasks for recon-all to run; defaults to 'all'. Run
-            `recon-all -help` for list of options. Multiple options can be
-            specified as a list of strings.
+            The tasks for recon-all to run. Run `recon-all -help` for list of
+            options. Multiple options can be specified as a list of strings.
+            Defaults to a list containing 'all' for the full cortical
+            reconstruction pipeline and '3T' for a non-uniformity correction
+            based on N3 (Zheng et al. NeuroImage, 2009) and special 3T atlas
+            for Talairach alignment (aka -schwartzya3t-atlas).
         t1_series : str | None
             The name of the T1-weighted MR series to use for cortex extraction.
             This parameter is optional, it only has an effect when running
@@ -190,7 +204,7 @@ class Freesurfer(ClusterBatch):
                                    '{:s}'.format(cpe.returncode, cpe.output))
             finally:
                 shutil.rmtree(tmpdir)
-            self.logger.info('...done.')
+            self.logger.info('...done converting.')
 
         if hemi != 'both':
             if hemi not in ['lh', 'rh']:
