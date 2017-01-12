@@ -14,13 +14,26 @@ import tempfile
 from glob import glob
 
 
-def convert_dicom_to_nifti(first_dicom, output_fname,
-                           converter='mri_convert'):
+def make_copy_of_dicom_dir(dicom_dir):
     tmpdir = tempfile.mkdtemp()
-    dicom_dir = os.path.dirname(first_dicom)
-    first_dicom = os.path.join(tmpdir, os.path.basename(first_dicom))
     for dcm in glob(os.path.join(dicom_dir, '*.*')):
         shutil.copy(dcm, tmpdir)
+    return tmpdir
+
+
+def first_file_in_dir(input_dir):
+    return glob(os.path.join(input_dir, '*.*'))[0]
+
+
+def convert_dicom_to_nifti(dicom, output_fname,
+                           converter='mri_convert'):
+    if os.path.isfile(dicom):
+        dicom_dir = os.path.dirname(dicom)
+    elif os.path.isdir(dicom):
+        dicom_dir = dicom
+
+    tmpdir = make_copy_of_dicom_dir(dicom_dir)
+    first_dicom = first_file_in_dir(tmpdir)
 
     if converter == 'mri_convert':
         cmd = ' '.join([converter, first_dicom, output_fname])
@@ -32,4 +45,5 @@ def convert_dicom_to_nifti(first_dicom, output_fname,
     except subp.CalledProcessError as cpe:
         raise RuntimeError('Conversion failed with error message: '
                            '{:s}'.format(cpe.returncode, cpe.output))
-    shutil.rmtree(tmpdir)
+    finally:
+        shutil.rmtree(tmpdir)

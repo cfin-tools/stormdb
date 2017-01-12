@@ -8,10 +8,14 @@ Classes related to Freesurfer
 #
 # License: BSD (3-clause)
 import os
+import subprocess as subp
+import shutil
+
 from six import string_types
 
+from .utils import first_file_in_dir, make_copy_of_dicom_dir
 from ..base import (enforce_path_exists, check_source_readable,
-                    parse_arguments)
+                    parse_arguments, _get_unique_series)
 from ..access import Query
 from ..cluster import ClusterBatch
 
@@ -105,15 +109,10 @@ class Freesurfer(ClusterBatch):
                 'Subject {0} not found in database!'.format(subject))
         cur_subj_dir = os.path.join(self.info['subjects_dir'], subject)
 
-        # Start building command, force subjects_dir on cluster nodes
+        # Build command, force subjects_dir on cluster nodes
         cmd = (recon_bin +
-               ' -{0} -subjid {1}'.format(directive, subject) +
-               ' -sd {0}'.format(self.info['subjects_dir']))
-
-        if hemi != 'both':
-            if hemi not in ['lh', 'rh']:
-                raise ValueError("Hemisphere must be 'lh' or 'rh'.")
-            cmd += ' -hemi {0}'.format(hemi)
+               ' -{} -subjid {}'.format(directive, subject) +
+               ' -sd {}'.format(self.info['subjects_dir']))
 
         # has DICOM conversion been performed?
         if not os.path.exists(cur_subj_dir) or not check_source_readable(
@@ -124,19 +123,23 @@ class Freesurfer(ClusterBatch):
                 else:
                     t1_series = self.info['t1_series']
 
-            series = Query(self.proj_name).filter_series(description=t1_series,
-                                                         subjects=subject,
-                                                         modalities="MR")
-            if len(series) == 0:
-                raise RuntimeError('No series found matching {0} for subject '
-                                   '{1}'.format(t1_series, subject))
-            elif len(series) > 1:
-                print('Multiple series match the target:')
-                print([s['seriename'] for s in series])
-                raise RuntimeError('More than one MR series found that '
-                                   'matches the pattern {0}'.format(t1_series))
-            dicom_path = os.path.join(series[0]['path'], series[0]['files'][0])
-            cmd += ' -i {dcm_pth:s}'.format(dcm_pth=dicom_path)
+            series = _get_unique_series(Query(self.proj_name), t1_series,
+                                        subject, 'MR')
+            tmpdir = make_copy_of_dicom_dir(series[0]['path'])
+            first_dicom = first_file_in_dir(tmpdir)
+            conv_cmd = cmd + ' -i {}'.format(first_dicom)
+            try:
+                subp.check_output([conv_cmd], stderr=subp.STDOUT, shell=True)
+            except subp.CalledProcessError as cpe:
+                raise RuntimeError('Conversion failed with error message: '
+                                   '{:s}'.format(cpe.returncode, cpe.output))
+            finally:
+                shutil.rmtree(tmpdir)
+
+        if hemi != 'both':
+            if hemi not in ['lh', 'rh']:
+                raise ValueError("Hemisphere must be 'lh' or 'rh'.")
+            cmd += ' -hemi {0}'.format(hemi)
 
         self.add_job(cmd, queue=queue, n_threads=n_threads,
                      job_name='recon-all')
