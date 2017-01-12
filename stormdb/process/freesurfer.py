@@ -85,9 +85,10 @@ class Freesurfer(ClusterBatch):
         subject : str
             Name (ID) of subject as a string. Both number and 3-character
             code must be given.
-        directive : str
-            The tasks for recon-all to run; default to 'all'. Run
-            `recon-all -help` for list of options.
+        directive : str | list or str
+            The tasks for recon-all to run; defaults to 'all'. Run
+            `recon-all -help` for list of options. Multiple options can be
+            specified as a list of strings.
         t1_series : str | None
             The name of the T1-weighted MR series to use for cortex extraction.
             This parameter is optional, it only has an effect when running
@@ -103,6 +104,12 @@ class Freesurfer(ClusterBatch):
         recon_bin : str (optional)
             Path to `recon-all` executable.
         """
+        if isinstance(directive, string_types):
+            directives = [directive]
+        elif not isinstance(directive, (list, tuple)):
+            raise ValueError('Directive must be string or list of strings.')
+        else:
+            directives = directive[:]  # copy!
 
         if subject not in self.info['valid_subjects']:
             raise RuntimeError(
@@ -110,8 +117,7 @@ class Freesurfer(ClusterBatch):
         cur_subj_dir = os.path.join(self.info['subjects_dir'], subject)
 
         # Build command, force subjects_dir on cluster nodes
-        cmd = (recon_bin +
-               ' -{} -subjid {}'.format(directive, subject) +
+        cmd = (recon_bin + ' -subjid {}'.format(subject) +
                ' -sd {}'.format(self.info['subjects_dir']))
 
         # has DICOM conversion been performed?
@@ -141,6 +147,7 @@ class Freesurfer(ClusterBatch):
                 raise ValueError("Hemisphere must be 'lh' or 'rh'.")
             cmd += ' -hemi {0}'.format(hemi)
 
+        cmd += ' -{}'.format(' -'.join(directives))
         self.add_job(cmd, queue=queue, n_threads=n_threads,
                      job_name='recon-all')
 
