@@ -8,10 +8,12 @@ Classes related to Freesurfer
 #
 # License: BSD (3-clause)
 import os
+import os.path as op
 import subprocess as subp
 import shutil
 
 from six import string_types
+from glob import glob
 
 from .utils import first_file_in_dir, make_copy_of_dicom_dir
 from ..base import (enforce_path_exists, check_source_readable,
@@ -201,7 +203,7 @@ class Freesurfer(ClusterBatch):
                 subp.check_output([conv_cmd], stderr=subp.STDOUT, shell=True)
             except subp.CalledProcessError as cpe:
                 raise RuntimeError('Conversion failed with error message: '
-                                   '{:s}'.format(cpe.returncode, cpe.output))
+                                   '{:s}'.format(cpe.output))
             finally:
                 shutil.rmtree(tmpdir)
             self.logger.info('...done converting.')
@@ -213,6 +215,190 @@ class Freesurfer(ClusterBatch):
 
         cmd += ' -{}'.format(' -'.join(directives))
         self.add_job(cmd, job_name='recon-all', **job_options)
+
+    def create_bem_surfaces(self, subject, flash5, analysis_name=None,
+                            flash30=None,
+                            job_options=dict(queue='short.q', n_threads=1)):
+        """Convert mri2mesh output to Freesurfer meshes suitable for BEMs.
+
+        Parameters
+        ----------
+        subject : subject ID (str) | list of subject IDs (str) | 'all'
+            Name (ID) of subject as a string. Both number and 3-character
+            code must be given. Multiple subjects IDs can be passed as a list.
+            The string 'all' is interpreted as all included subjects (i.e.,
+            those that are not excluded) in the database.
+        flash5 : str | None (optional)
+            The name of the multi-echo FLASH series with 5 degree flip angle
+            that will be used to create the 3 main compartments of the head:
+            inner skull, outer skull and outer skin. If None (default), the
+            watershed-algorithm in Freesurfer will be used to create the inner
+            skull surface only, though results vary.
+        flash30 : str | None (optional)
+            The name of the multi-echo FLASH series with 30 degree flip angle.
+            If None (default), only the 5 degree FLASH will be used. The
+            difference in quality of the 3 layers extracted is minor.
+        analysis_name : str | None
+            Optional suffix to add to subject name (e.g. '_with_t2mask')
+        job_options : dict
+            Dictionary of optional arguments to pass to ClusterJob. The
+            default set here is: job_options=dict(queue='short.q', n_threads=1)
+        """
+        if isinstance(subject, (list, tuple)):
+            self.logger.info('Processing multiple subjects:')
+            subjects = subject
+        elif isinstance(subject, string_types):
+            if subject == 'all':
+                self.logger.info('Processing all included subjects:')
+                subjects = self.info['valid_subjects']
+            else:
+                subjects = [subject]
+
+        do_watershed, do_flash = False, False
+        if flash5 is None and flash30 is not None:
+            raise ValueError('To use FLASH 30, FLASH 5 must be defined.')
+        elif flash5 is None and flash30 is None:
+            do_watershed = True
+        elif flash5 is not None:
+            if not isinstance(flash5, string_types):
+                raise ValueError('flash5 must be a series name (str)')
+            if flash30 is not None and not isinstance(flash30, string_types):
+                raise ValueError('flash30 must be a series name (str)')
+            do_flash = True
+
+        for sub in subjects:
+            self.logger.info(sub)
+            if subject not in self.info['valid_subjects']:
+                raise RuntimeError(
+                    'Subject {0} not found in database!'.format(subject))
+            cur_subj_dir = os.path.join(self.info['subjects_dir'], subject)
+            try:
+                enforce_path_exists(cur_subj_dir)
+            except IOError as err:
+                msg = ('{0}\nFailed to find accessible Freesurfer output; '
+                       'did it complete successfully?'.format(err))
+                if isinstance(analysis_name, string_types):
+                    msg += ('\nPlease also check that the analysis_name is '
+                            'correct: {0}'.format(analysis_name))
+                raise RuntimeError(msg)
+
+            try:
+                if do_flash:
+                    self._create_bem_surfaces_flash(
+                        sub, flash5, flash30=flash30,
+                        analysis_name=analysis_name,
+                        job_options=job_options)
+                elif do_watershed:
+                    self._create_bem_surfaces_watershed(sub)
+            except:
+                self._joblist = []  # evicerate on error
+                raise
+
+        self.logger.info('{} jobs created successfully, ready to submit.'
+                         .format(len(self._joblist)))
+
+    def _create_bem_surfaces_flash(self, subject, flash5,
+                                   analysis_name=None, flash30=None,
+                                   job_options=dict(queue='short.q',
+                                                    n_threads=1)):
+        """Create BEMs for single subject."""
+        series = _get_unique_series(Query(self.proj_name), flash5,
+                                    subject, 'MR')
+        mri_dir = op.join(self.info['subjects_dir'], subject, 'mri')
+        flash_dir = op.join(mri_dir, 'flash')
+        flash_dcm = op.join(flash_dir, 'dicom')  # same for 5 and 30!
+        make_copy_of_dicom_dir(series[0]['path'], flash_dcm)
+        if flash30 is not None:
+            series = _get_unique_series(Query(self.proj_name), flash30,
+                                        subject, 'MR')
+            make_copy_of_dicom_dir(series[0]['path'], flash_dcm)
+
+        cmd = 'cd {}; mne_organize_dicom {}; cd -'.format(flash_dir, flash_dcm)
+        try:
+            subp.check_output([cmd], stderr=subp.STDOUT, shell=True)
+        except subp.CalledProcessError as cpe:
+            raise RuntimeError('mne_organize_dicom failed with error message: '
+                               '{:s}'.format(cpe.returncode, cpe.output))
+        # get directory names created, may differ due to unicode encoding :-o
+        # NB this assumes the series name contains the angle in degrees!
+        flash5_dir = op.basename(glob(op.join(flash_dir, '*5*'))[0])
+        os.symlink(flash5_dir, op.join(flash_dir, 'flash05'))
+        if flash30 is not None:
+            flash30_dir = op.basename(glob(op.join(flash_dir, '*30*'))[0])
+            os.symlink(flash30_dir, op.join(flash_dir, 'flash05'))
+
+        n_echos = len(glob(op.join(flash_dir, 'flash05')))
+        convert_flash_mris_cfin(subject, flash30=flash30, n_echos=n_echos,
+                                subjects_dir=self.info['subjects_dir'],
+                                logger=self.logger)
+
+    def _create_bem_surfaces_watershed(self, subject):
+        pass
+
+    #             cmd = 'mne_watershed_bem --overwrite'
+#     cmd = '''
+# cd ${SUBJECTS_DIR}/${SUBJECT}/bem
+# ln -s watershed/${SUBJECT}_inner_skull_surface ${SUBJECT}-inner_skull.surf
+# ln -s watershed/${SUBJECT}_outer_skin_surface ${SUBJECT}-outer_skin.surf
+# ln -s watershed/${SUBJECT}_outer_skull_surface ${SUBJECT}-outer_skull.surf
+# cd ''' + ad._project_folder
+#     cmd = '''
+# cd ${SUBJECTS_DIR}/${SUBJECT}/bem
+# head=${SUBJECTS_DIR}/${SUBJECT}/bem/${SUBJECT}-head.fif
+# head_low=${SUBJECTS_DIR}/${SUBJECT}/bem/${SUBJECT}-head-lowres.fif
+# if [ -e $head ]; then
+#     printf 'moving existing head surface %s' $head
+#     mv $head $head_low
+# fi
+# # NB: needs the -f flag to continue despite topological errors!
+# ${MNE_PYTHON}/bin/mne make_scalp_surfaces -s ${SUBJECT} -o -f
+# head_medium=${SUBJECTS_DIR}/${SUBJECT}/bem/${SUBJECT}-head-medium.fif
+# printf 'linking %s as main head surface' $head_medium
+# ln -s $head_medium $head
+# '''
+# cmd = """
+# # symlink the raw...../MR/00X.gre_5o_PDW/files to flash/dicom, then
+#
+# src=${SUBJECTS_DIR}/${SUBJECT}/flash/dicom
+# dest=${SUBJECTS_DIR}/${SUBJECT}/flash
+#
+# cd $dest
+# mne_organize_dicom $src
+# ln -s *gre_5* flash05
+# mne_flash_bem --noflash30
+# """
+#
+#         meshfix_opts = ' -u 10 --vertices {:d} --fsmesh'.format(n_vertices)
+#         bem_dir = os.path.join(m2m_outputs['fs_dir'], 'bem')
+#         bem_surfaces = dict(inner_skull='csf.stl',
+#                             outer_skull='skull.stl',
+#                             outer_skin='skin.stl')
+#         for bem_layer, surf in bem_surfaces.items():
+#             surf_fname = os.path.join(m2m_outputs['m2m_dir'], surf)
+#             if not check_source_readable(surf_fname):
+#                 raise RuntimeError(
+#                     'Could not find surface {surf:s}; mri2mesh may have exited'
+#                     ' with an error, please check.'.format(surf=surf))
+#             bem_fname = os.path.join(bem_dir, bem_layer)
+#
+#             cmds = ['meshfix {sfn:s} {mfo:s} -o {bfn:s}'
+#                     .format(sfn=surf_fname, mfo=meshfix_opts, bfn=bem_fname)]
+#
+#             xfm_volume = os.path.join(m2m_outputs['m2m_dir'], 'tmp',
+#                                       'subcortical_FS.nii.gz')
+#             xfm = os.path.join(m2m_outputs['m2m_dir'], 'tmp', 'unity.xfm')
+#
+#             # NB This is needed! Otherwise the stl->fsmesh conversion output
+#             # lacks some transformation and is misaligned with the MR
+#             cmds += ['mris_transform --dst {xv:s} --src {xv:s} '
+#                      '{bfn:s}.fsmesh {xfm:s} {bfn:s}.surf'
+#                      .format(xv=xfm_volume, bfn=bem_fname, xfm=xfm)]
+#             cmds += ['rm {bfn:s}.fsmesh'.format(bfn=bem_fname)]
+#
+#         # One job per subject, since these are "cheap" operations
+#         self.add_job(cmds, job_name='meshfix',
+#                      working_dir=self.info['output_dir'],
+#                      **job_options)
 
     # def apply_to_subjects(self, subjects='all', method='recon_all',
     #                       method_args=None):
@@ -253,3 +439,171 @@ class Freesurfer(ClusterBatch):
     #
     #     self.logger.info(
     #         'Successfully prepared {0} jobs.'.format(len(subjects)))
+
+
+# NB This is a modified version of that found in mne-python/mne/bem.py
+# (13 Jan 2017). Some options are removed, and the number of echos can vary.
+def convert_flash_mris_cfin(subject, flash30=False, n_echos=8,
+                            subjects_dir=None, unwarp=False, logger=None):
+    """Convert DICOM files for use with make_flash_bem.
+
+    Parameters
+    ----------
+    subject : str
+        Subject name.
+    flash30 : bool
+        Use 30-degree flip angle data.
+    unwarp : bool
+        Run grad_unwarp with -unwarp option on each of the converted
+        data sets. It requires FreeSurfer's MATLAB toolbox to be properly
+        installed.
+    subjects_dir : string, or None
+        Path to SUBJECTS_DIR if it is not set in the environment.
+
+    This function assumes that the Freesurfer segmentation of the subject
+    has been completed. In particular, the T1.mgz and brain.mgz MRI volumes
+    should be, as usual, in the subject's mri directory.
+    """
+
+    echos = ['{:03d}'.format(e) for e in range(1, n_echos + 1)]
+    alt_echos = ['{:03d}'.format(e) for e in range(2, n_echos + 2)]
+
+    env, mri_dir = _prepare_env(subject, subjects_dir,
+                                requires_freesurfer=True,
+                                requires_mne=False)[:2]
+    curdir = os.getcwd()
+    # Step 1a : Data conversion to mgz format
+    if not op.exists(op.join(mri_dir, 'flash', 'parameter_maps')):
+        os.makedirs(op.join(mri_dir, 'flash', 'parameter_maps'))
+    echos_done = 0
+    # Assume always need to convert first!
+    logger.info("\n---- Converting Flash images ----")
+    # echos = ['001', '002', '003', '004', '005', '006', '007', '008']
+    if flash30:
+        flashes = ['05']
+    else:
+        flashes = ['05', '30']
+    #
+    missing = False
+    for flash in flashes:
+        for echo in echos:
+            if not op.isdir(op.join('flash' + flash, echo)):
+                missing = True
+    if missing:
+        # echos = ['002', '003', '004', '005', '006', '007', '008', '009']
+        echos = alt_echos
+        for flash in flashes:
+            for echo in echos:
+                if not op.isdir(op.join('flash' + flash, echo)):
+                    raise RuntimeError("Directory %s is missing."
+                                       % op.join('flash' + flash, echo))
+    #
+    for flash in flashes:
+        for echo in echos:
+            if not op.isdir(op.join('flash' + flash, echo)):
+                raise RuntimeError("Directory %s is missing."
+                                   % op.join('flash' + flash, echo))
+            sample_file = glob.glob(op.join('flash' + flash, echo, '*'))[0]
+            dest_file = op.join(mri_dir, 'flash',
+                                'mef' + flash + '_' + echo + '.mgz')
+            # do not redo if already present
+            if op.isfile(dest_file):
+                logger.info("The file %s is already there")
+            else:
+                cmd = ['mri_convert', sample_file, dest_file]
+                _run_subprocess(cmd, env=env, stderr=subp.STDOUT, shell=True)
+                echos_done += 1
+    # Step 1b : Run grad_unwarp on converted files
+    os.chdir(op.join(mri_dir, "flash"))
+    files = glob.glob("mef*.mgz")
+    if unwarp:
+        logger.info("\n---- Unwarp mgz data sets ----")
+        for infile in files:
+            outfile = infile.replace(".mgz", "u.mgz")
+            cmd = ['grad_unwarp', '-i', infile, '-o', outfile, '-unwarp',
+                   'true']
+            _run_subprocess(cmd, env=env, stderr=subp.STDOUT, shell=True)
+    # Clear parameter maps if some of the data were reconverted
+    if echos_done > 0 and op.exists("parameter_maps"):
+        shutil.rmtree("parameter_maps")
+        logger.info("\nParameter maps directory cleared")
+    if not op.exists("parameter_maps"):
+        os.makedirs("parameter_maps")
+    # Step 2 : Create the parameter maps
+    if flash30:
+        logger.info("\n---- Creating the parameter maps ----")
+        if unwarp:
+            files = glob.glob("mef05*u.mgz")
+        if len(os.listdir('parameter_maps')) == 0:
+            cmd = ['mri_ms_fitparms'] + files + ['parameter_maps']
+            _run_subprocess(cmd, env=env, stderr=subp.STDOUT, shell=True)
+        else:
+            logger.info("Parameter maps were already computed")
+        # Step 3 : Synthesize the flash 5 images
+        logger.info("\n---- Synthesizing flash 5 images ----")
+        os.chdir('parameter_maps')
+        if not op.exists('flash5.mgz'):
+            cmd = ['mri_synthesize', '20 5 5', 'T1.mgz', 'PD.mgz',
+                   'flash5.mgz']
+            _run_subprocess(cmd, env=env, stderr=subp.STDOUT, shell=True)
+            os.remove('flash5_reg.mgz')
+        else:
+            logger.info("Synthesized flash 5 volume is already there")
+    else:
+        logger.info("\n---- Averaging flash5 echoes ----")
+        os.chdir('parameter_maps')
+        if unwarp:
+            files = glob.glob("mef05*u.mgz")
+        else:
+            files = glob.glob("mef05*.mgz")
+        cmd = ['mri_average', '-noconform', files, 'flash5.mgz']
+        _run_subprocess(cmd, env=env, stderr=subp.STDOUT, shell=True)
+        if op.exists('flash5_reg.mgz'):
+            os.remove('flash5_reg.mgz')
+
+    # Go back to initial directory
+    os.chdir(curdir)
+
+
+def _prepare_env(subject, subjects_dir, requires_freesurfer, requires_mne):
+    """Helper to prepare an env object for subprocess calls.
+
+    NB: Copied from mne-python/mne/bem.py !
+    """
+    env = os.environ.copy()
+    if requires_freesurfer and not os.environ.get('FREESURFER_HOME'):
+        raise RuntimeError('I cannot find freesurfer. The FREESURFER_HOME '
+                           'environment variable is not set.')
+    if requires_mne and not os.environ.get('MNE_ROOT'):
+        raise RuntimeError('I cannot find the MNE command line tools. The '
+                           'MNE_ROOT environment variable is not set.')
+
+    if not isinstance(subject, string_types):
+        raise TypeError('The subject argument must be set')
+
+    # subjects_dir = get_subjects_dir(subjects_dir, raise_error=True)
+    if not op.isdir(subjects_dir):
+        raise RuntimeError('Could not find the MRI data directory "%s"'
+                           % subjects_dir)
+    subject_dir = op.join(subjects_dir, subject)
+    if not op.isdir(subject_dir):
+        raise RuntimeError('Could not find the subject data directory "%s"'
+                           % (subject_dir,))
+    env['SUBJECT'] = subject
+    env['SUBJECTS_DIR'] = subjects_dir
+    mri_dir = op.join(subject_dir, 'mri')
+    bem_dir = op.join(subject_dir, 'bem')
+    return env, mri_dir, bem_dir
+
+
+def _run_subprocess(cmd, msg=None, **kwargs):
+    if isinstance(cmd, string_types):
+        cmd = list(cmd)
+    try:
+        subp.check_output(cmd, **kwargs)
+    except subp.CalledProcessError as cpe:
+        if msg is None:
+            msg = ''
+        else:
+            msg += '\n'
+        raise RuntimeError('{:s}{:s}'.format(msg, cpe.output))
