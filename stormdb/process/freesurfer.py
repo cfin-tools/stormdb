@@ -302,8 +302,12 @@ class Freesurfer(ClusterBatch):
                                    job_options=dict(queue='short.q',
                                                     n_threads=1)):
         """Create BEMs for single subject."""
+        if analysis_name is not None:
+            subject += analysis_name
+
         series = _get_unique_series(Query(self.proj_name), flash5,
                                     subject, 'MR')
+        self.logger.info(series[0]['path'])
         mri_dir = op.join(self.info['subjects_dir'], subject, 'mri')
         flash_dir = op.join(mri_dir, 'flash')
         flash_dcm = op.join(flash_dir, 'dicom')  # same for 5 and 30!
