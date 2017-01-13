@@ -307,7 +307,7 @@ class Freesurfer(ClusterBatch):
 
         series = _get_unique_series(Query(self.proj_name), flash5,
                                     subject, 'MR')
-        self.logger.info(series[0]['path'])
+        flash5_name = series[0]['seriename']
         mri_dir = op.join(self.info['subjects_dir'], subject, 'mri')
         flash_dir = op.join(mri_dir, 'flash')
         flash_dcm = op.join(flash_dir, 'dicom')  # same for 5 and 30!
@@ -315,6 +315,7 @@ class Freesurfer(ClusterBatch):
         if flash30 is not None:
             series = _get_unique_series(Query(self.proj_name), flash30,
                                         subject, 'MR')
+            flash30_name = series[0]['seriename']
             make_copy_of_dicom_dir(series[0]['path'], flash_dcm)
 
         cmd = 'cd {}; mne_organize_dicom {}; cd -'.format(flash_dir, flash_dcm)
@@ -323,13 +324,11 @@ class Freesurfer(ClusterBatch):
         except subp.CalledProcessError as cpe:
             raise RuntimeError('mne_organize_dicom failed with error message: '
                                '{:s}'.format(cpe.returncode, cpe.output))
-        # get directory names created, may differ due to unicode encoding :-o
-        # NB this assumes the series name contains the angle in degrees!
-        flash5_dir = op.basename(glob(op.join(flash_dir, '*5*'))[0])
+        flash5_dir = op.join(flash_dir, flash5_name)
         os.symlink(flash5_dir, op.join(flash_dir, 'flash05'))
         if flash30 is not None:
-            flash30_dir = op.basename(glob(op.join(flash_dir, '*30*'))[0])
-            os.symlink(flash30_dir, op.join(flash_dir, 'flash05'))
+            flash30_dir = op.join(flash_dir, flash30_name)
+            os.symlink(flash30_dir, op.join(flash_dir, 'flash30'))
 
         n_echos = len(glob(op.join(flash_dir, 'flash05')))
         convert_flash_mris_cfin(subject, flash30=flash30, n_echos=n_echos,
