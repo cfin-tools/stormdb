@@ -315,7 +315,7 @@ class Freesurfer(ClusterBatch):
         if analysis_name is not None:
             subject_dir += analysis_name
 
-        self.logger.info('Converting flash series to mgz...')
+        self.logger.info('Copying DICOM FLASH data for speed...')
         series = _get_unique_series(Query(self.proj_name), flash5,
                                     subject, 'MR')
         flash5_name = series[0]['seriename']
@@ -329,19 +329,40 @@ class Freesurfer(ClusterBatch):
             flash30_name = series[0]['seriename']
             make_copy_of_dicom_dir(series[0]['path'], flash_dcm)
 
+        self.logger.info('Running mne_organize_dicom...')
         cmd = 'cd {}; mne_organize_dicom {}; cd -'.format(flash_dir, flash_dcm)
         try:
             subp.check_output([cmd], stderr=subp.STDOUT, shell=True)
         except subp.CalledProcessError as cpe:
             raise RuntimeError('mne_organize_dicom failed with error message: '
                                '{:s}'.format(cpe.returncode, cpe.output))
+        ### CUT ###
+        # NB DEBUG
+        _run_subprocess('mv {}/005* {}/005_{}'.format(flash_dir, flash_dir,
+                                                      flash5_name))
+        _run_subprocess('mv {}/006* {}/006_{}'.format(flash_dir, flash_dir,
+                                                      flash30_name))
+        ### CUT ###
+
         flash5_dir = op.join(flash_dir, flash5_name)
         os.symlink(flash5_dir, op.join(flash_dir, 'flash05'))
         if flash30 is not None:
             flash30_dir = op.join(flash_dir, flash30_name)
             os.symlink(flash30_dir, op.join(flash_dir, 'flash30'))
 
-        n_echos = len(glob(op.join(flash_dir, 'flash05')))
+        n_echos = len(os.listdir(op.join(flash_dir, 'flash05')))
+        if n_echos < 3:
+            raise ValueError(
+                'Less than 3 echos are currently not supported.')
+        elif flash30 is not None:
+            n_echos_30 = len(os.listdir(op.join(flash_dir, 'flash30')))
+            if n_echos_30 != n_echos:
+                raise ValueError(
+                    '5 and 30 degree sequences must have equal no. echos, '
+                    'found {} and {}, resp.'.format(n_echos, n_echos_30))
+        self.logger.info('Found {:d} multi-echos...'.format(n_echos))
+
+        # The function below handles logging messages
         convert_flash_mris_cfin(subject, flash30=flash30, n_echos=n_echos,
                                 subjects_dir=self.info['subjects_dir'],
                                 logger=self.logger)
@@ -353,7 +374,7 @@ class Freesurfer(ClusterBatch):
                                        job_options=dict(queue='short.q',
                                                         n_threads=1)):
         """Create inner_skull for single subject."""
-        subject_dir = subject
+        subject_dirname = subject
         if analysis_name is not None:
             subject_dirname += analysis_name
 
@@ -388,7 +409,6 @@ class Freesurfer(ClusterBatch):
                 head_cmds += ['export SUBJECTS_DIR={}'
                               .format(self.info['subjects_dir'])]
 
-            head = op.join(bem_dir, '{}-head.fif'.format(subject_dirname))
             head_cmds = 'cd {}; mkheadsurf -subjid {}'.format(bem_dir,
                                                               subject_dirname)
             head_cmds += ['mne_surf2bem --surf ../surf/lh.smseghead --id 4 '
