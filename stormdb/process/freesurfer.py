@@ -218,7 +218,8 @@ class Freesurfer(ClusterBatch):
 
     def create_bem_surfaces(self, subject, analysis_name=None,
                             flash5=None, flash30=None, make_coreg_head=True,
-                            job_options=dict(queue='short.q', n_threads=1)):
+                            job_options=dict(queue='short.q', n_threads=1),
+                            **kwargs):
         """Convert mri2mesh output to Freesurfer meshes suitable for BEMs.
 
         Parameters
@@ -248,6 +249,9 @@ class Freesurfer(ClusterBatch):
         job_options : dict
             Dictionary of optional arguments to pass to ClusterJob. The
             default set here is: job_options=dict(queue='short.q', n_threads=1)
+        **kwargs : optional
+            Optional keyword arguments, depending on whether FLASH-images or
+            watershed-algorithm is used.
         """
         if isinstance(subject, (list, tuple)):
             self.logger.info('Processing multiple subjects:')
@@ -293,12 +297,12 @@ class Freesurfer(ClusterBatch):
                         sub, flash5, flash30=flash30,
                         make_coreg_head=make_coreg_head,
                         analysis_name=analysis_name,
-                        job_options=job_options)
+                        job_options=job_options, **kwargs)
                 elif do_watershed:
                     self._create_bem_surfaces_watershed(
                         sub, make_coreg_head=make_coreg_head,
                         analysis_name=analysis_name,
-                        job_options=job_options)
+                        job_options=job_options, **kwargs)
             except:
                 self._joblist = []  # evicerate on error
                 raise
@@ -338,10 +342,10 @@ class Freesurfer(ClusterBatch):
                                '{:s}'.format(cpe.returncode, cpe.output))
         ### CUT ###
         # NB DEBUG
-        _run_subprocess('mv {}/005* {}/005_{}'.format(flash_dir, flash_dir,
-                                                      flash5_name))
-        _run_subprocess('mv {}/006* {}/006_{}'.format(flash_dir, flash_dir,
-                                                      flash30_name))
+        _run_subprocess('cd {}; ln -s 005_gre* 005_{}'
+                        .format(flash_dir, flash5_name))
+        _run_subprocess('cd {}; ln -s 006_gre* 006_{}'
+                        .format(flash_dir, flash30_name))
         ### CUT ###
 
         flash5_dir = op.join(flash_dir, flash5_name)
@@ -388,11 +392,7 @@ class Freesurfer(ClusterBatch):
         else:
             atlas_str = ''
 
-        env = os.environ.copy()
         self.logger.info('Running mne_watershed_bem...')
-        print(env['SUBJECTS_DIR'])
-        print(self.info['subjects_dir'])
-        print(subject_dirname)
         ws_cmd = ['mne_watershed_bem --subject {sub:s} {atl:s} '
                   '--overwrite'.format(sub=subject_dirname, atl=atlas_str)]
 
@@ -406,11 +406,6 @@ class Freesurfer(ClusterBatch):
 
         if make_coreg_head:
             head_cmds = []
-            # Just in case: commands below are dependent on it set in environ
-            if 'SUBJECTS_DIR' not in os.environ.keys():
-                head_cmds += ['export SUBJECTS_DIR={}'
-                              .format(self.info['subjects_dir'])]
-
             head_cmds = ['cd {}; mkheadsurf -subjid {}'.format(bem_dir,
                                                                subject_dirname)]
             head_cmds += ['mne_surf2bem --surf ../surf/lh.smseghead --id 4 '
@@ -422,8 +417,12 @@ class Freesurfer(ClusterBatch):
 
         cmd = ' ;\n'.join(ws_cmd + ln_cmds + head_cmds)
 
+        # Just in case: commands below are dependent on it set in environ
+        if 'SUBJECTS_DIR' not in os.environ.keys():
+            cmd = ('export SUBJECTS_DIR={} ;\n'
+                   .format(self.info['subjects_dir'])) + cmd
         # NB CLUSTERISE!
-        _run_subprocess(cmd, env=env, stderr=subp.STDOUT, shell=True)
+        _run_subprocess(cmd, stderr=subp.STDOUT, shell=True)
 #     cmd = '''
 # cd ${SUBJECTS_DIR}/${SUBJECT}/bem
 # ln -s watershed/${SUBJECT}_inner_skull_surface ${SUBJECT}-inner_skull.surf
