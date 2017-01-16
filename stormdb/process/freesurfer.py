@@ -390,7 +390,9 @@ class Freesurfer(ClusterBatch):
 
         env = os.environ.copy()
         self.logger.info('Running mne_watershed_bem...')
-
+        print(env['SUBJECTS_DIR'])
+        print(self.info['subjects_dir'])
+        print(subject_dirname)
         ws_cmd = ['mne_watershed_bem --subject {sub:s} {atl:s} '
                   '--overwrite'.format(sub=subject_dirname, atl=atlas_str)]
 
@@ -409,8 +411,8 @@ class Freesurfer(ClusterBatch):
                 head_cmds += ['export SUBJECTS_DIR={}'
                               .format(self.info['subjects_dir'])]
 
-            head_cmds = 'cd {}; mkheadsurf -subjid {}'.format(bem_dir,
-                                                              subject_dirname)
+            head_cmds = ['cd {}; mkheadsurf -subjid {}'.format(bem_dir,
+                                                               subject_dirname)]
             head_cmds += ['mne_surf2bem --surf ../surf/lh.smseghead --id 4 '
                           '--check --fif {}-head-dense.fif'
                           .format(subject_dirname)]
@@ -647,7 +649,7 @@ def _prepare_env(subject, subjects_dir, requires_freesurfer, requires_mne):
 
 def _run_subprocess(cmd, msg=None, **kwargs):
     if isinstance(cmd, string_types):
-        cmd = list(cmd)
+        cmd = [cmd]
     try:
         subp.check_output(cmd, **kwargs)
     except subp.CalledProcessError as cpe:
