@@ -21,8 +21,12 @@ def make_copy_of_dicom_dir(dicom_dir, out_dir=None):
         out_dir = tempfile.mkdtemp()
     else:
         mkdir_p(out_dir)
-    # NB this silently does nothing if glob finds nothing!
-    for dcm in glob(os.path.join(dicom_dir, '*.*')):
+
+    all_files = glob(os.path.join(dicom_dir, '*.*'))
+    if len(all_files) == 0:
+        raise RuntimeError(
+            'No files to copy found in {}'.format(dicom_dir))
+    for dcm in all_files:
         shutil.copy(dcm, out_dir)
     return out_dir
 

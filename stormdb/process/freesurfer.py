@@ -216,8 +216,8 @@ class Freesurfer(ClusterBatch):
         cmd += ' -{}'.format(' -'.join(directives))
         self.add_job(cmd, job_name='recon-all', **job_options)
 
-    def create_bem_surfaces(self, subject, flash5, analysis_name=None,
-                            flash30=None,
+    def create_bem_surfaces(self, subject, analysis_name=None,
+                            flash5=None, flash30=None, make_coreg_head=True,
                             job_options=dict(queue='short.q', n_threads=1)):
         """Convert mri2mesh output to Freesurfer meshes suitable for BEMs.
 
@@ -238,6 +238,11 @@ class Freesurfer(ClusterBatch):
             The name of the multi-echo FLASH series with 30 degree flip angle.
             If None (default), only the 5 degree FLASH will be used. The
             difference in quality of the 3 layers extracted is minor.
+        make_coreg_head : bool
+            If True (default), make a high-resolution head (outer skin) surface
+            for MEG/EEG coregistration purposes. NB: The number of vertices is
+            currently hard-coded to be 20,000; this is arbitrary though, and
+            could be made more or less depending on needs.
         analysis_name : str | None
             Optional suffix to add to subject name (e.g. '_with_t2mask')
         job_options : dict
@@ -286,10 +291,14 @@ class Freesurfer(ClusterBatch):
                 if do_flash:
                     self._create_bem_surfaces_flash(
                         sub, flash5, flash30=flash30,
+                        make_coreg_head=make_coreg_head,
                         analysis_name=analysis_name,
                         job_options=job_options)
                 elif do_watershed:
-                    self._create_bem_surfaces_watershed(sub)
+                    self._create_bem_surfaces_watershed(
+                        sub, make_coreg_head=make_coreg_head,
+                        analysis_name=analysis_name,
+                        job_options=job_options)
             except:
                 self._joblist = []  # evicerate on error
                 raise
@@ -297,18 +306,20 @@ class Freesurfer(ClusterBatch):
         self.logger.info('{} jobs created successfully, ready to submit.'
                          .format(len(self._joblist)))
 
-    def _create_bem_surfaces_flash(self, subject, flash5,
+    def _create_bem_surfaces_flash(self, subject, flash5, make_coreg_head=True,
                                    analysis_name=None, flash30=None,
                                    job_options=dict(queue='short.q',
                                                     n_threads=1)):
         """Create BEMs for single subject."""
+        subject_dir = subject
         if analysis_name is not None:
-            subject += analysis_name
+            subject_dir += analysis_name
 
+        self.logger.info('Converting flash series to mgz...')
         series = _get_unique_series(Query(self.proj_name), flash5,
                                     subject, 'MR')
         flash5_name = series[0]['seriename']
-        mri_dir = op.join(self.info['subjects_dir'], subject, 'mri')
+        mri_dir = op.join(self.info['subjects_dir'], subject_dir, 'mri')
         flash_dir = op.join(mri_dir, 'flash')
         flash_dcm = op.join(flash_dir, 'dicom')  # same for 5 and 30!
         make_copy_of_dicom_dir(series[0]['path'], flash_dcm)
@@ -334,11 +345,63 @@ class Freesurfer(ClusterBatch):
         convert_flash_mris_cfin(subject, flash30=flash30, n_echos=n_echos,
                                 subjects_dir=self.info['subjects_dir'],
                                 logger=self.logger)
+        self.logger.info('...done')
 
-    def _create_bem_surfaces_watershed(self, subject):
-        pass
+    def _create_bem_surfaces_watershed(self, subject, analysis_name=None,
+                                       atlas=False, gcaatlas=False,
+                                       make_coreg_head=False,
+                                       job_options=dict(queue='short.q',
+                                                        n_threads=1)):
+        """Create inner_skull for single subject."""
+        subject_dir = subject
+        if analysis_name is not None:
+            subject_dirname += analysis_name
 
-    #             cmd = 'mne_watershed_bem --overwrite'
+        if atlas and gcaatlas:
+            raise ValueError(
+                'atlas and gcaatlas cannot be used together; choose one.')
+        elif atlas:
+            atlas_str = '--atlas'
+        elif atlas:
+            atlas_str = '--gcaatlas'
+        else:
+            atlas_str = ''
+
+        env = os.environ.copy()
+        self.logger.info('Running mne_watershed_bem...')
+
+        ws_cmd = ['mne_watershed_bem --subject {sub:s} {atl:s} '
+                  '--overwrite'.format(sub=subject_dirname, atl=atlas_str)]
+
+        bem_dir = op.join(self.info['subjects_dir'], subject_dirname, 'bem')
+        surf_names = ('inner_skull', 'outer_skull', 'outer_skin')
+        ln_cmds = []
+        for sn in surf_names:
+            surf_fname = op.join(bem_dir, sn + '.surf')
+            ln_cmds += ['ln -s watershed/{}_{}_surface {}'
+                        .format(subject_dirname, sn, surf_fname)]
+
+        if make_coreg_head:
+            head_cmds = []
+            # Just in case: commands below are dependent on it set in environ
+            if 'SUBJECTS_DIR' not in os.environ.keys():
+                head_cmds += ['export SUBJECTS_DIR={}'
+                              .format(self.info['subjects_dir'])]
+
+            head = op.join(bem_dir, '{}-head.fif'.format(subject_dirname))
+            head_cmds = 'cd {}; mkheadsurf -subjid {}'.format(bem_dir,
+                                                              subject_dirname)
+            head_cmds += ['mne_surf2bem --surf ../surf/lh.smseghead --id 4 '
+                          '--check --fif {}-head-dense.fif'
+                          .format(subject_dirname)]
+            head_cmds += ['rm -f {sub:s}-head.fif;'
+                          'ln -s {sub:s}-head-dense.fif {sub:s}-head.fif'
+                          .format(sub=subject_dirname)]
+
+        cmd = ' ;\n'.join(ws_cmd + ln_cmds + head_cmds)
+
+        # NB CLUSTERISE!
+        _run_subprocess(cmd, env=env, stderr=subp.STDOUT, shell=True)
 #     cmd = '''
 # cd ${SUBJECTS_DIR}/${SUBJECT}/bem
 # ln -s watershed/${SUBJECT}_inner_skull_surface ${SUBJECT}-inner_skull.surf
@@ -403,49 +466,12 @@ class Freesurfer(ClusterBatch):
 #                      working_dir=self.info['output_dir'],
 #                      **job_options)
 
-    # def apply_to_subjects(self, subjects='all', method='recon_all',
-    #                       method_args=None):
-    #     """Apply a Freesufer-method to a list of subjects.
-    #
-    #     Parameters
-    #     ----------
-    #     subjects : list of str | str
-    #         List of subjects to loop over. If 'all', all included subjects are
-    #         selected from the database (default).
-    #     method : str
-    #         Name of Freesurfer-method to apply. Default: 'recon_all'
-    #     method_args : dict | None
-    #         Dictionary of argument value-pairs to pass on to method. If None,
-    #         default values of the method are used.
-    #     """
-    #     if isinstance(subjects, string_types) and subjects == 'all':
-    #         subjects = self.info['valid_subjects']
-    #     elif not isinstance(subjects, (list, tuple)):
-    #         raise ValueError("Specify either list of subjects, or 'all'.")
-    #     args, kwargs = parse_arguments(eval('self.' + method))
-    #
-    #     for sub in subjects:
-    #         if not isinstance(sub, string_types):
-    #             raise ValueError('Each subject name must be given as string.')
-    #         cmd = 'self.' + method + "('{0}'".format(sub)
-    #         for k, v in kwargs.iteritems():
-    #             if method_args is not None and k in method_args.keys():
-    #                 v = method_args[k]
-    #
-    #             if isinstance(v, string_types):
-    #                 cmd += ", {0}='{1}'".format(k, v)
-    #             else:
-    #                 cmd += ', {0}={1}'.format(k, v)
-    #
-    #         cmd += ')'
-    #         eval(cmd)
-    #
-    #     self.logger.info(
-    #         'Successfully prepared {0} jobs.'.format(len(subjects)))
 
 
 # NB This is a modified version of that found in mne-python/mne/bem.py
 # (13 Jan 2017). Some options are removed, and the number of echos can vary.
+
+# NB!! Should be clusterised?
 def convert_flash_mris_cfin(subject, flash30=False, n_echos=8,
                             subjects_dir=None, unwarp=False, logger=None):
     """Convert DICOM files for use with make_flash_bem.
