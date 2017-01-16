@@ -326,7 +326,7 @@ class Freesurfer(ClusterBatch):
         mri_dir = op.join(self.info['subjects_dir'], subject_dir, 'mri')
         flash_dir = op.join(mri_dir, 'flash')
         flash_dcm = op.join(flash_dir, 'dicom')  # same for 5 and 30!
-        make_copy_of_dicom_dir(series[0]['path'], flash_dcm)
+#        make_copy_of_dicom_dir(series[0]['path'], flash_dcm)
         if flash30 is not None:
             series = _get_unique_series(Query(self.proj_name), flash30,
                                         subject, 'MR')
@@ -334,32 +334,35 @@ class Freesurfer(ClusterBatch):
             make_copy_of_dicom_dir(series[0]['path'], flash_dcm)
 
         self.logger.info('Running mne_organize_dicom...')
-        cmd = 'cd {}; mne_organize_dicom {}; cd -'.format(flash_dir, flash_dcm)
+        cmd = 'cd {}; mne_organize_dicom {}; '.format(flash_dir, flash_dcm)
+        cmd = ''  # DEBUG
+
+
+#        flash5_dir = op.join(flash_dir, flash5_name)
+#        flash5_link = op.realpath(op.join(flash_dir, 'flash05'))
+#        os.symlink(flash5_dir, flash5_link)
+        cmd += 'ln -s {} flash05 ;'.format(flash5_name)
+
+        if flash30 is not None:
+#            flash30_dir = op.join(flash_dir, flash30_name)
+#            flash30_link = op.realpath(op.join(flash_dir, 'flash30'))
+#            os.symlink(flash30_dir, flash30_link)
+            cmd += 'ln -s {} flash30 ;'.format(flash30_name)
+
+        print(cmd)
         try:
             subp.check_output([cmd], stderr=subp.STDOUT, shell=True)
         except subp.CalledProcessError as cpe:
             raise RuntimeError('mne_organize_dicom failed with error message: '
                                '{:s}'.format(cpe.returncode, cpe.output))
-        ### CUT ###
-        # NB DEBUG
-        _run_subprocess('cd {}; ln -s 005_gre* 005_{}'
-                        .format(flash_dir, flash5_name))
-        _run_subprocess('cd {}; ln -s 006_gre* 006_{}'
-                        .format(flash_dir, flash30_name))
-        ### CUT ###
 
-        flash5_dir = op.join(flash_dir, flash5_name)
-        os.symlink(flash5_dir, op.join(flash_dir, 'flash05'))
-        if flash30 is not None:
-            flash30_dir = op.join(flash_dir, flash30_name)
-            os.symlink(flash30_dir, op.join(flash_dir, 'flash30'))
 
-        n_echos = len(os.listdir(op.join(flash_dir, 'flash05')))
+        n_echos = len(os.listdir(flash5_link))
         if n_echos < 3:
             raise ValueError(
                 'Less than 3 echos are currently not supported.')
         elif flash30 is not None:
-            n_echos_30 = len(os.listdir(op.join(flash_dir, 'flash30')))
+            n_echos_30 = len(os.listdir(flash30_link))
             if n_echos_30 != n_echos:
                 raise ValueError(
                     '5 and 30 degree sequences must have equal no. echos, '
@@ -408,7 +411,7 @@ class Freesurfer(ClusterBatch):
             head_cmds = []
             head_cmds = ['cd {}; mkheadsurf -subjid {}'.format(bem_dir,
                                                                subject_dirname)]
-            head_cmds += ['mne_surf2bem --surf ../surf/lh.smseghead --id 4 '
+            head_cmds += ['mne_surf2bem --surf ../surf/lh.seghead --id 4 '
                           '--check --fif {}-head-dense.fif'
                           .format(subject_dirname)]
             head_cmds += ['rm -f {sub:s}-head.fif;'
@@ -418,9 +421,8 @@ class Freesurfer(ClusterBatch):
         cmd = ' ;\n'.join(ws_cmd + ln_cmds + head_cmds)
 
         # Just in case: commands below are dependent on it set in environ
-        if 'SUBJECTS_DIR' not in os.environ.keys():
-            cmd = ('export SUBJECTS_DIR={} ;\n'
-                   .format(self.info['subjects_dir'])) + cmd
+        cmd = ('export SUBJECTS_DIR={} ;\n'
+               .format(self.info['subjects_dir'])) + cmd
         # NB CLUSTERISE!
         _run_subprocess(cmd, stderr=subp.STDOUT, shell=True)
 #     cmd = '''
