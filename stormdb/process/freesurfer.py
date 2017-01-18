@@ -11,9 +11,9 @@ import os
 import os.path as op
 import subprocess as subp
 import shutil
+import glob
 
 from six import string_types
-from glob import glob
 
 from .utils import first_file_in_dir, make_copy_of_dicom_dir
 from ..base import (enforce_path_exists, check_source_readable,
@@ -324,7 +324,8 @@ class Freesurfer(ClusterBatch):
         # self.logger.info('Copying DICOM FLASH data for speed...')
         series = _get_unique_series(Query(self.proj_name), flash5,
                                     subject, 'MR')
-        flash5_name = series[0]['seriename']
+        flash5_name = '{:03d}_{:s}'.format(int(series[0]['serieno']),
+                                           series[0]['seriename'])
         mri_dir = op.join(self.info['subjects_dir'], subject_dir, 'mri')
         flash_dir = op.join(mri_dir, 'flash')
         flash_dcm = op.join(flash_dir, 'dicom')  # same for 5 and 30!
@@ -339,39 +340,24 @@ class Freesurfer(ClusterBatch):
             flash30_name = series[0]['seriename']
             cmd = add_to_command(cmd, 'cp {}/* {}',
                                  series[0]['path'], flash_dcm)
-            # make_copy_of_dicom_dir(series[0]['path'], flash_dcm)
 
         # self.logger.info('Running mne_organize_dicom...')
-        cmd = add_to_command(cmd, 'cd {}; mne_organize_dicom {}',
-                             flash_dir, flash_dcm)
-        cmd = add_to_command(cmd, 'ln -s {} flash05', flash5_name)
-#        flash5_dir = op.join(flash_dir, flash5_name)
-#        flash5_link = op.realpath(op.join(flash_dir, 'flash05'))
-#        os.symlink(flash5_dir, flash5_link)
-        # cmd += 'ln -s {} flash05 ;'.format(flash5_name)
+#        cmd = add_to_command(cmd, 'cd {}; mne_organize_dicom {}',
+#                             flash_dir, flash_dcm)
+
+        cmd = add_to_command(cmd, 'rm flash05; ln -s {} flash05', flash5_name)
 
         flash30_str = ''
         if flash30 is not None:
             cmd = add_to_command(cmd, 'ln -s {} flash30', flash30_name)
             flash30_str = ' --noflash30'
-#            flash30_dir = op.join(flash_dir, flash30_name)
-#            flash30_link = op.realpath(op.join(flash_dir, 'flash30'))
-#            os.symlink(flash30_dir, flash30_link)
-
-        # try:
-        #     subp.check_output([cmd], stderr=subp.STDOUT, shell=True)
-        # except subp.CalledProcessError as cpe:
-        #     raise RuntimeError('mne_organize_dicom failed with error message: '
-        #                        '{:s}'.format(cpe.returncode, cpe.output))
-
-        cmd = add_to_command(cmd, ("NECHOS=$(find flash05 "
-                                   """-type d -name "0*" | wc -l)"""))
 
         cmd = add_to_command(cmd, ('cfin_flash_bem -s {sub:s} -d {subdir:s}'
-                                   '{f30_str:s} -e $NECHOS'),
+                                   '{f30_str:s}'),
                              sub=subject_dir, subdir=self.info['subjects_dir'],
                              f30_str=flash30_str)
-        self.add_job(cmd, job_name='cfin_flash_bem', **job_options)
+
+        self.add_job(cmd, job_name='cfin_flash_bem', cleanup=False, **job_options)
 
     def _create_bem_surfaces_watershed(self, subject, analysis_name=None,
                                        atlas=False, gcaatlas=False,
@@ -537,9 +523,9 @@ def convert_flash_mris_cfin(subject, flash30=False, n_echos=8,
     print("\n---- Converting Flash images ----")
     # echos = ['001', '002', '003', '004', '005', '006', '007', '008']
     if flash30:
-        flashes = ['05']
-    else:
         flashes = ['05', '30']
+    else:
+        flashes = ['05']
     #
     missing = False
     for flash in flashes:
@@ -568,7 +554,7 @@ def convert_flash_mris_cfin(subject, flash30=False, n_echos=8,
                 print("The file %s is already there")
             else:
                 cmd = ['mri_convert', sample_file, dest_file]
-                _run_subprocess(cmd, env=env, stderr=subp.STDOUT, shell=True)
+                _run_subprocess(cmd, env=env, stderr=subp.STDOUT)
                 echos_done += 1
     # Step 1b : Run grad_unwarp on converted files
     os.chdir(op.join(mri_dir, "flash"))
@@ -579,7 +565,7 @@ def convert_flash_mris_cfin(subject, flash30=False, n_echos=8,
             outfile = infile.replace(".mgz", "u.mgz")
             cmd = ['grad_unwarp', '-i', infile, '-o', outfile, '-unwarp',
                    'true']
-            _run_subprocess(cmd, env=env, stderr=subp.STDOUT, shell=True)
+            _run_subprocess(cmd, env=env, stderr=subp.STDOUT)
     # Clear parameter maps if some of the data were reconverted
     if echos_done > 0 and op.exists("parameter_maps"):
         shutil.rmtree("parameter_maps")
@@ -593,7 +579,7 @@ def convert_flash_mris_cfin(subject, flash30=False, n_echos=8,
             files = glob.glob("mef05*u.mgz")
         if len(os.listdir('parameter_maps')) == 0:
             cmd = ['mri_ms_fitparms'] + files + ['parameter_maps']
-            _run_subprocess(cmd, env=env, stderr=subp.STDOUT, shell=True)
+            _run_subprocess(cmd, env=env, stderr=subp.STDOUT)
         else:
             print("Parameter maps were already computed")
         # Step 3 : Synthesize the flash 5 images
@@ -602,7 +588,7 @@ def convert_flash_mris_cfin(subject, flash30=False, n_echos=8,
         if not op.exists('flash5.mgz'):
             cmd = ['mri_synthesize', '20 5 5', 'T1.mgz', 'PD.mgz',
                    'flash5.mgz']
-            _run_subprocess(cmd, env=env, stderr=subp.STDOUT, shell=True)
+            _run_subprocess(cmd, env=env, stderr=subp.STDOUT)
             os.remove('flash5_reg.mgz')
         else:
             print("Synthesized flash 5 volume is already there")
@@ -614,7 +600,7 @@ def convert_flash_mris_cfin(subject, flash30=False, n_echos=8,
         else:
             files = glob.glob("mef05*.mgz")
         cmd = ['mri_average', '-noconform', files, 'flash5.mgz']
-        _run_subprocess(cmd, env=env, stderr=subp.STDOUT, shell=True)
+        _run_subprocess(cmd, env=env, stderr=subp.STDOUT)
         if op.exists('flash5_reg.mgz'):
             os.remove('flash5_reg.mgz')
 
@@ -657,6 +643,7 @@ def _run_subprocess(cmd, msg=None, **kwargs):
     if isinstance(cmd, string_types):
         cmd = [cmd]
     try:
+        print(cmd)
         subp.check_output(cmd, **kwargs)
     except subp.CalledProcessError as cpe:
         if msg is None:

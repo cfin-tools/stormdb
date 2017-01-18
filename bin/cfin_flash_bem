@@ -42,6 +42,8 @@ from __future__ import print_function
 
 # Authors: Lorenzo De Santis
 
+import os
+import os.path as op
 from mne.bem import make_flash_bem
 from stormdb.process import convert_flash_mris_cfin
 
@@ -56,8 +58,6 @@ def run():
                       help="Subject name", default=None)
     parser.add_option("-d", "--subjects-dir", dest="subjects_dir",
                       help="Subjects directory", default=None)
-    parser.add_option("-e", "--n_echos", dest="n_echos", type=int,
-                      help="Number of echos (default: 8)", default=8)
     parser.add_option("-3", "--noflash30", dest="noflash30",
                       action="store_true", default=True,
                       help=("Skip the 30-degree flip angle data"),)
@@ -73,7 +73,6 @@ def run():
 
     subject = options.subject
     subjects_dir = options.subjects_dir
-    n_echos = options.n_echos
     flash30 = not options.noflash30
     unwarp = options.unwarp
     overwrite = options.overwrite
@@ -81,6 +80,10 @@ def run():
     if options.subject is None:
         parser.print_help()
         raise RuntimeError('The subject argument must be set')
+
+    flash_dir = op.join(os.getcwd(), 'flash05')
+    n_echos = len([name for name in os.listdir(flash_dir) if
+        op.isdir(op.join(flash_dir, name))])
 
     convert_flash_mris_cfin(subject=subject, subjects_dir=subjects_dir,
                             flash30=flash30, n_echos=n_echos, unwarp=unwarp)
