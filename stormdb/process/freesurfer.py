@@ -17,7 +17,7 @@ from glob import glob
 
 from .utils import first_file_in_dir, make_copy_of_dicom_dir
 from ..base import (enforce_path_exists, check_source_readable,
-                    _get_unique_series)
+                    _get_unique_series, add_to_command)
 from ..access import Query
 from ..cluster import ClusterBatch
 
@@ -319,43 +319,52 @@ class Freesurfer(ClusterBatch):
         if analysis_name is not None:
             subject_dir += analysis_name
 
-        self.logger.info('Copying DICOM FLASH data for speed...')
+        cmd = None
+
+        # self.logger.info('Copying DICOM FLASH data for speed...')
         series = _get_unique_series(Query(self.proj_name), flash5,
                                     subject, 'MR')
         flash5_name = series[0]['seriename']
         mri_dir = op.join(self.info['subjects_dir'], subject_dir, 'mri')
         flash_dir = op.join(mri_dir, 'flash')
         flash_dcm = op.join(flash_dir, 'dicom')  # same for 5 and 30!
+
 #        make_copy_of_dicom_dir(series[0]['path'], flash_dcm)
+        cmd = add_to_command(cmd, 'mkdir -p {}', flash_dcm)
+        cmd = add_to_command(cmd, 'cp {}/* {}', series[0]['path'], flash_dcm)
+
         if flash30 is not None:
             series = _get_unique_series(Query(self.proj_name), flash30,
                                         subject, 'MR')
             flash30_name = series[0]['seriename']
-            make_copy_of_dicom_dir(series[0]['path'], flash_dcm)
+            cmd = add_to_command(cmd, 'cp {}/* {}',
+                                 series[0]['path'], flash_dcm)
+            # make_copy_of_dicom_dir(series[0]['path'], flash_dcm)
 
-        self.logger.info('Running mne_organize_dicom...')
-        cmd = 'cd {}; mne_organize_dicom {}; '.format(flash_dir, flash_dcm)
-        cmd = ''  # DEBUG
-
-
+        # self.logger.info('Running mne_organize_dicom...')
+        cmd = add_to_command(cmd, 'cd {}; mne_organize_dicom {}',
+                             flash_dir, flash_dcm)
+        cmd = add_to_command(cmd, 'ln -s {} flash05', flash5_name)
 #        flash5_dir = op.join(flash_dir, flash5_name)
 #        flash5_link = op.realpath(op.join(flash_dir, 'flash05'))
 #        os.symlink(flash5_dir, flash5_link)
-        cmd += 'ln -s {} flash05 ;'.format(flash5_name)
+        # cmd += 'ln -s {} flash05 ;'.format(flash5_name)
 
         if flash30 is not None:
+            cmd = add_to_command(cmd, 'ln -s {} flash30', flash30_name)
 #            flash30_dir = op.join(flash_dir, flash30_name)
 #            flash30_link = op.realpath(op.join(flash_dir, 'flash30'))
 #            os.symlink(flash30_dir, flash30_link)
-            cmd += 'ln -s {} flash30 ;'.format(flash30_name)
 
         print(cmd)
-        try:
-            subp.check_output([cmd], stderr=subp.STDOUT, shell=True)
-        except subp.CalledProcessError as cpe:
-            raise RuntimeError('mne_organize_dicom failed with error message: '
-                               '{:s}'.format(cpe.returncode, cpe.output))
+        # try:
+        #     subp.check_output([cmd], stderr=subp.STDOUT, shell=True)
+        # except subp.CalledProcessError as cpe:
+        #     raise RuntimeError('mne_organize_dicom failed with error message: '
+        #                        '{:s}'.format(cpe.returncode, cpe.output))
 
+        cmd = add_to_command(cmd, ("n_echos=$(find flash05 "
+                                   """-type d -name "0*" | wc -l)"""))
 
         n_echos = len(os.listdir(flash5_link))
         if n_echos < 3:
@@ -496,7 +505,7 @@ class Freesurfer(ClusterBatch):
 
 # NB!! Should be clusterised?
 def convert_flash_mris_cfin(subject, flash30=False, n_echos=8,
-                            subjects_dir=None, unwarp=False, logger=None):
+                            subjects_dir=None, unwarp=False):
     """Convert DICOM files for use with make_flash_bem.
 
     Parameters
@@ -529,7 +538,7 @@ def convert_flash_mris_cfin(subject, flash30=False, n_echos=8,
         os.makedirs(op.join(mri_dir, 'flash', 'parameter_maps'))
     echos_done = 0
     # Assume always need to convert first!
-    logger.info("\n---- Converting Flash images ----")
+    print("\n---- Converting Flash images ----")
     # echos = ['001', '002', '003', '004', '005', '006', '007', '008']
     if flash30:
         flashes = ['05']
@@ -560,7 +569,7 @@ def convert_flash_mris_cfin(subject, flash30=False, n_echos=8,
                                 'mef' + flash + '_' + echo + '.mgz')
             # do not redo if already present
             if op.isfile(dest_file):
-                logger.info("The file %s is already there")
+                print("The file %s is already there")
             else:
                 cmd = ['mri_convert', sample_file, dest_file]
                 _run_subprocess(cmd, env=env, stderr=subp.STDOUT, shell=True)
@@ -569,7 +578,7 @@ def convert_flash_mris_cfin(subject, flash30=False, n_echos=8,
     os.chdir(op.join(mri_dir, "flash"))
     files = glob.glob("mef*.mgz")
     if unwarp:
-        logger.info("\n---- Unwarp mgz data sets ----")
+        print("\n---- Unwarp mgz data sets ----")
         for infile in files:
             outfile = infile.replace(".mgz", "u.mgz")
             cmd = ['grad_unwarp', '-i', infile, '-o', outfile, '-unwarp',
@@ -578,21 +587,21 @@ def convert_flash_mris_cfin(subject, flash30=False, n_echos=8,
     # Clear parameter maps if some of the data were reconverted
     if echos_done > 0 and op.exists("parameter_maps"):
         shutil.rmtree("parameter_maps")
-        logger.info("\nParameter maps directory cleared")
+        print("\nParameter maps directory cleared")
     if not op.exists("parameter_maps"):
         os.makedirs("parameter_maps")
     # Step 2 : Create the parameter maps
     if flash30:
-        logger.info("\n---- Creating the parameter maps ----")
+        print("\n---- Creating the parameter maps ----")
         if unwarp:
             files = glob.glob("mef05*u.mgz")
         if len(os.listdir('parameter_maps')) == 0:
             cmd = ['mri_ms_fitparms'] + files + ['parameter_maps']
             _run_subprocess(cmd, env=env, stderr=subp.STDOUT, shell=True)
         else:
-            logger.info("Parameter maps were already computed")
+            print("Parameter maps were already computed")
         # Step 3 : Synthesize the flash 5 images
-        logger.info("\n---- Synthesizing flash 5 images ----")
+        print("\n---- Synthesizing flash 5 images ----")
         os.chdir('parameter_maps')
         if not op.exists('flash5.mgz'):
             cmd = ['mri_synthesize', '20 5 5', 'T1.mgz', 'PD.mgz',
@@ -600,9 +609,9 @@ def convert_flash_mris_cfin(subject, flash30=False, n_echos=8,
             _run_subprocess(cmd, env=env, stderr=subp.STDOUT, shell=True)
             os.remove('flash5_reg.mgz')
         else:
-            logger.info("Synthesized flash 5 volume is already there")
+            print("Synthesized flash 5 volume is already there")
     else:
-        logger.info("\n---- Averaging flash5 echoes ----")
+        print("\n---- Averaging flash5 echoes ----")
         os.chdir('parameter_maps')
         if unwarp:
             files = glob.glob("mef05*u.mgz")

@@ -96,3 +96,17 @@ def apply_method(method='recon_all', *args, **kwargs):
 
     cmd += ')'
     eval(cmd)
+
+
+def add_to_command(cmd, addition, *args, **kwargs):
+    if cmd is None:
+        cmd = []
+
+    fmt = addition.format(*args, **kwargs)
+
+    if isinstance(cmd, string_types):
+        cmd = '{:s};\n{:s}'.format(cmd, fmt)
+    elif isinstance(cmd, list):
+        cmd += ['{:s}'.format(fmt)]
+
+    return cmd
