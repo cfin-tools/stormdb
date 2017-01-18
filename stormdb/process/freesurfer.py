@@ -366,17 +366,17 @@ class Freesurfer(ClusterBatch):
         cmd = add_to_command(cmd, ("n_echos=$(find flash05 "
                                    """-type d -name "0*" | wc -l)"""))
 
-        n_echos = len(os.listdir(flash5_link))
-        if n_echos < 3:
-            raise ValueError(
-                'Less than 3 echos are currently not supported.')
-        elif flash30 is not None:
-            n_echos_30 = len(os.listdir(flash30_link))
-            if n_echos_30 != n_echos:
-                raise ValueError(
-                    '5 and 30 degree sequences must have equal no. echos, '
-                    'found {} and {}, resp.'.format(n_echos, n_echos_30))
-        self.logger.info('Found {:d} multi-echos...'.format(n_echos))
+        # n_echos = len(os.listdir(flash5_link))
+        # if n_echos < 3:
+        #     raise ValueError(
+        #         'Less than 3 echos are currently not supported.')
+        # elif flash30 is not None:
+        #     n_echos_30 = len(os.listdir(flash30_link))
+        #     if n_echos_30 != n_echos:
+        #         raise ValueError(
+        #             '5 and 30 degree sequences must have equal no. echos, '
+        #             'found {} and {}, resp.'.format(n_echos, n_echos_30))
+        # self.logger.info('Found {:d} multi-echos...'.format(n_echos))
 
         # The function below handles logging messages
         convert_flash_mris_cfin(subject, flash30=flash30, n_echos=n_echos,
