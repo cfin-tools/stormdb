@@ -59,7 +59,7 @@ def run():
     parser.add_option("-e", "--n_echos", dest="n_echos",
                       help="Number of echos (default: 8)", default=8)
     parser.add_option("-3", "--noflash30", dest="noflash30",
-                      action="store_true", default=False,
+                      action="store_true", default=True,
                       help=("Skip the 30-degree flip angle data"),)
     parser.add_option("-u", "--unwarp", dest="unwarp",
                       action="store_true", default=False,

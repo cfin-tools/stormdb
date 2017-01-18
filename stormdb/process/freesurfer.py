@@ -358,7 +358,6 @@ class Freesurfer(ClusterBatch):
 #            flash30_link = op.realpath(op.join(flash_dir, 'flash30'))
 #            os.symlink(flash30_dir, flash30_link)
 
-        print(cmd)
         # try:
         #     subp.check_output([cmd], stderr=subp.STDOUT, shell=True)
         # except subp.CalledProcessError as cpe:
