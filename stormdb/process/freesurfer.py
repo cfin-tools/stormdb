@@ -368,7 +368,7 @@ class Freesurfer(ClusterBatch):
                                    """-type d -name "0*" | wc -l)"""))
 
         cmd = add_to_command(cmd, ('cfin_flash_bem -s {sub:s} -d {subdir:s}'
-                                   '{f30_str:s} -e $(n_echos)'),
+                                   '{f30_str:s} -e $\{n_echos\}'),
                              sub=subject_dir, subdir=self.info['subjects_dir'],
                              f30_str=flash30_str)
         self.add_job(cmd, job_name='cfin_flash_bem', **job_options)
