@@ -379,7 +379,7 @@ class Freesurfer(ClusterBatch):
         # self.logger.info('Found {:d} multi-echos...'.format(n_echos))
 
         # The function below handles logging messages
-        convert_flash_mris_cfin(subject, flash30=flash30, n_echos=n_echos,
+        convert_flash_mris_cfin(subject, flash30=flash30, n_echos=8,
                                 subjects_dir=self.info['subjects_dir'],
                                 logger=self.logger)
         self.logger.info('...done')
