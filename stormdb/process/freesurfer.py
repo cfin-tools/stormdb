@@ -364,11 +364,11 @@ class Freesurfer(ClusterBatch):
         #     raise RuntimeError('mne_organize_dicom failed with error message: '
         #                        '{:s}'.format(cpe.returncode, cpe.output))
 
-        cmd = add_to_command(cmd, ("n_echos=$(find flash05 "
+        cmd = add_to_command(cmd, ("NECHOS=$(find flash05 "
                                    """-type d -name "0*" | wc -l)"""))
 
         cmd = add_to_command(cmd, ('cfin_flash_bem -s {sub:s} -d {subdir:s}'
-                                   '{f30_str:s} -e ${n_echos}'),
+                                   '{f30_str:s} -e $NECHOS'),
                              sub=subject_dir, subdir=self.info['subjects_dir'],
                              f30_str=flash30_str)
         self.add_job(cmd, job_name='cfin_flash_bem', **job_options)
