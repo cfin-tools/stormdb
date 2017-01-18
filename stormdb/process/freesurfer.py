@@ -350,8 +350,10 @@ class Freesurfer(ClusterBatch):
 #        os.symlink(flash5_dir, flash5_link)
         # cmd += 'ln -s {} flash05 ;'.format(flash5_name)
 
+        flash30_str = ''
         if flash30 is not None:
             cmd = add_to_command(cmd, 'ln -s {} flash30', flash30_name)
+            flash30_str = ' --noflash30'
 #            flash30_dir = op.join(flash_dir, flash30_name)
 #            flash30_link = op.realpath(op.join(flash_dir, 'flash30'))
 #            os.symlink(flash30_dir, flash30_link)
@@ -366,23 +368,11 @@ class Freesurfer(ClusterBatch):
         cmd = add_to_command(cmd, ("n_echos=$(find flash05 "
                                    """-type d -name "0*" | wc -l)"""))
 
-        # n_echos = len(os.listdir(flash5_link))
-        # if n_echos < 3:
-        #     raise ValueError(
-        #         'Less than 3 echos are currently not supported.')
-        # elif flash30 is not None:
-        #     n_echos_30 = len(os.listdir(flash30_link))
-        #     if n_echos_30 != n_echos:
-        #         raise ValueError(
-        #             '5 and 30 degree sequences must have equal no. echos, '
-        #             'found {} and {}, resp.'.format(n_echos, n_echos_30))
-        # self.logger.info('Found {:d} multi-echos...'.format(n_echos))
-
-        # The function below handles logging messages
-        convert_flash_mris_cfin(subject, flash30=flash30, n_echos=8,
-                                subjects_dir=self.info['subjects_dir'],
-                                logger=self.logger)
-        self.logger.info('...done')
+        cmd = add_to_command(cmd, ('cfin_flash_bem -s {sub:s} -d {subdir:s}'
+                                   '{f30_str:s} -e $(n_echos)'),
+                             sub=subject_dir, subdir=self.info['subjects_dir'],
+                             f30_str=flash30_str)
+        self.add_job(cmd, job_name='cfin_flash_bem', **job_options)
 
     def _create_bem_surfaces_watershed(self, subject, analysis_name=None,
                                        atlas=False, gcaatlas=False,
@@ -432,8 +422,11 @@ class Freesurfer(ClusterBatch):
         # Just in case: commands below are dependent on it set in environ
         cmd = ('export SUBJECTS_DIR={} ;\n'
                .format(self.info['subjects_dir'])) + cmd
+
         # NB CLUSTERISE!
         _run_subprocess(cmd, stderr=subp.STDOUT, shell=True)
+
+
 #     cmd = '''
 # cd ${SUBJECTS_DIR}/${SUBJECT}/bem
 # ln -s watershed/${SUBJECT}_inner_skull_surface ${SUBJECT}-inner_skull.surf
@@ -499,11 +492,8 @@ class Freesurfer(ClusterBatch):
 #                      **job_options)
 
 
-
 # NB This is a modified version of that found in mne-python/mne/bem.py
 # (13 Jan 2017). Some options are removed, and the number of echos can vary.
-
-# NB!! Should be clusterised?
 def convert_flash_mris_cfin(subject, flash30=False, n_echos=8,
                             subjects_dir=None, unwarp=False):
     """Convert DICOM files for use with make_flash_bem.
@@ -525,6 +515,13 @@ def convert_flash_mris_cfin(subject, flash30=False, n_echos=8,
     has been completed. In particular, the T1.mgz and brain.mgz MRI volumes
     should be, as usual, in the subject's mri directory.
     """
+
+    if n_echos < 3:
+        raise ValueError(
+            'Less than 3 echos are currently not supported.')
+    elif flash30 and n_echos != 8:
+        raise ValueError(
+            'When using the 30 degree sequence, exactly 8 echos must be used')
 
     echos = ['{:03d}'.format(e) for e in range(1, n_echos + 1)]
     alt_echos = ['{:03d}'.format(e) for e in range(2, n_echos + 2)]
