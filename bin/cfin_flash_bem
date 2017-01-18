@@ -56,7 +56,7 @@ def run():
                       help="Subject name", default=None)
     parser.add_option("-d", "--subjects-dir", dest="subjects_dir",
                       help="Subjects directory", default=None)
-    parser.add_option("-e", "--n_echos", dest="n_echos",
+    parser.add_option("-e", "--n_echos", dest="n_echos", type=int,
                       help="Number of echos (default: 8)", default=8)
     parser.add_option("-3", "--noflash30", dest="noflash30",
                       action="store_true", default=True,
