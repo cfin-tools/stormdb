@@ -349,10 +349,10 @@ class Freesurfer(ClusterBatch):
 
         cmd = add_to_command(cmd, 'rm flash05; ln -s {} flash05', flash5_name)
 
-        flash30_str = ''
+        flash30_str = ' --noflash30'
         if flash30 is not None:
             cmd = add_to_command(cmd, 'ln -s {} flash30', flash30_name)
-            flash30_str = ' --noflash30'
+            flash30_str = ''
 
         cmd = add_to_command(cmd, ('cfin_flash_bem -s {sub:s} -d {subdir:s}'
                                    '{f30_str:s} --overwrite'),
