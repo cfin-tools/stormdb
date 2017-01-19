@@ -390,12 +390,14 @@ class Freesurfer(ClusterBatch):
         cmd = None
 
         # Just in case: commands below are dependent on it set in environ
-        cmd = add_to_command(cmd, 'export SUBJECTS_DIR={}',
-                             self.info['subjects_dir'])
+        # cmd = add_to_command(cmd, 'export SUBJECTS_DIR={}',
+        #                     self.info['subjects_dir'])
 
-        cmd = add_to_command(cmd, ('mne_watershed_bem --subject {sub:s} '
-                             ' {atl:s} --overwrite'), sub=subject_dirname,
-                             atl=atlas_str)
+        # NB Using local version of mne_watershed_bem
+        cmd = add_to_command(cmd, ('cfin_watershed_bem --sd {sd:s} '
+                                   '--subject {sub:s} {atl:s} --overwrite'),
+                             sd=self.info['subjects_dir'],
+                             sub=subject_dirname, atl=atlas_str)
 
         bem_dir = op.join(self.info['subjects_dir'], subject_dirname, 'bem')
         surf_names = ('inner_skull', 'outer_skull', 'outer_skin')
