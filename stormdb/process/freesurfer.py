@@ -15,7 +15,6 @@ import glob
 import sys
 
 from six import string_types
-from mne.utils import run_subprocess
 
 from .utils import first_file_in_dir, make_copy_of_dicom_dir
 from ..base import (enforce_path_exists, check_source_readable,
@@ -557,8 +556,6 @@ def convert_flash_mris_cfin(subject, flash30=False, n_echos=8,
             else:
                 cmd = ['mri_convert', sample_file, dest_file]
                 _run_subprocess(cmd, stderr=subp.STDOUT, shell=True)
-                # run_subprocess(cmd, env=env, stdout=sys.stdout,
-                #                stderr=sys.stderr)
                 echos_done += 1
     # Step 1b : Run grad_unwarp on converted files
     os.chdir(op.join(mri_dir, "flash"))
@@ -570,8 +567,6 @@ def convert_flash_mris_cfin(subject, flash30=False, n_echos=8,
             cmd = ['grad_unwarp', '-i', infile, '-o', outfile, '-unwarp',
                    'true']
             _run_subprocess(cmd, stderr=subp.STDOUT, shell=True)
-            # run_subprocess(cmd, env=env, stdout=sys.stdout,
-            #                stderr=sys.stderr)
     # Clear parameter maps if some of the data were reconverted
     if echos_done > 0 and op.exists("parameter_maps"):
         shutil.rmtree("parameter_maps")
@@ -586,8 +581,6 @@ def convert_flash_mris_cfin(subject, flash30=False, n_echos=8,
         if len(os.listdir('parameter_maps')) == 0:
             cmd = ['mri_ms_fitparms'] + files + ['parameter_maps']
             _run_subprocess(cmd, stderr=subp.STDOUT, shell=True)
-            # run_subprocess(cmd, env=env, stdout=sys.stdout,
-            #                stderr=sys.stderr)
         else:
             print("Parameter maps were already computed")
         # Step 3 : Synthesize the flash 5 images
@@ -597,8 +590,6 @@ def convert_flash_mris_cfin(subject, flash30=False, n_echos=8,
             cmd = ['mri_synthesize', '20 5 5', 'T1.mgz', 'PD.mgz',
                    'flash5.mgz']
             _run_subprocess(cmd, stderr=subp.STDOUT, shell=True)
-            # run_subprocess(cmd, env=env, stdout=sys.stdout,
-            #                stderr=sys.stderr)
             os.remove('flash5_reg.mgz')
         else:
             print("Synthesized flash 5 volume is already there")
@@ -611,8 +602,6 @@ def convert_flash_mris_cfin(subject, flash30=False, n_echos=8,
             files = glob.glob("mef05*.mgz")
         cmd = ['mri_average', '-noconform'] + files + ['flash5.mgz']
         _run_subprocess(cmd, stderr=subp.STDOUT, shell=True)
-        # run_subprocess(cmd, env=env, stdout=sys.stdout,
-        #                stderr=sys.stderr)
         if op.exists('flash5_reg.mgz'):
             os.remove('flash5_reg.mgz')
 
@@ -654,6 +643,10 @@ def _prepare_env(subject, subjects_dir, requires_freesurfer, requires_mne):
 def _run_subprocess(cmd, msg=None, **kwargs):
     if isinstance(cmd, string_types):
         cmd = [cmd]
+    elif 'shell' in kwargs.keys():
+        if kwargs['shell']:
+            # for some reason check_output fails if cmd is not a string
+            cmd = ' '.join(cmd)
     try:
         print(cmd)
         subp.check_output(cmd, **kwargs)
