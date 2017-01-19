@@ -594,7 +594,6 @@ def _run_subprocess(cmd, msg=None, **kwargs):
             # for some reason check_output fails if cmd is not a string
             cmd = ' '.join(cmd)
     try:
-        print(cmd)
         subp.check_output(cmd, **kwargs)
     except subp.CalledProcessError as cpe:
         if msg is None:
