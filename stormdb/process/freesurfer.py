@@ -381,7 +381,7 @@ class Freesurfer(ClusterBatch):
                 'atlas and gcaatlas cannot be used together; choose one.')
         elif atlas:
             atlas_str = '--atlas'
-        elif atlas:
+        elif gcaatlas:
             atlas_str = '--gcaatlas'
         else:
             atlas_str = ''
@@ -409,71 +409,6 @@ class Freesurfer(ClusterBatch):
 
         self.add_job(cmd, job_name='watershed_bem',
                      cleanup=True, **job_options)
-
-
-#     cmd = '''
-# cd ${SUBJECTS_DIR}/${SUBJECT}/bem
-# ln -s watershed/${SUBJECT}_inner_skull_surface ${SUBJECT}-inner_skull.surf
-# ln -s watershed/${SUBJECT}_outer_skin_surface ${SUBJECT}-outer_skin.surf
-# ln -s watershed/${SUBJECT}_outer_skull_surface ${SUBJECT}-outer_skull.surf
-# cd ''' + ad._project_folder
-#     cmd = '''
-# cd ${SUBJECTS_DIR}/${SUBJECT}/bem
-# head=${SUBJECTS_DIR}/${SUBJECT}/bem/${SUBJECT}-head.fif
-# head_low=${SUBJECTS_DIR}/${SUBJECT}/bem/${SUBJECT}-head-lowres.fif
-# if [ -e $head ]; then
-#     printf 'moving existing head surface %s' $head
-#     mv $head $head_low
-# fi
-# # NB: needs the -f flag to continue despite topological errors!
-# ${MNE_PYTHON}/bin/mne make_scalp_surfaces -s ${SUBJECT} -o -f
-# head_medium=${SUBJECTS_DIR}/${SUBJECT}/bem/${SUBJECT}-head-medium.fif
-# printf 'linking %s as main head surface' $head_medium
-# ln -s $head_medium $head
-# '''
-# cmd = """
-# # symlink the raw...../MR/00X.gre_5o_PDW/files to flash/dicom, then
-#
-# src=${SUBJECTS_DIR}/${SUBJECT}/flash/dicom
-# dest=${SUBJECTS_DIR}/${SUBJECT}/flash
-#
-# cd $dest
-# mne_organize_dicom $src
-# ln -s *gre_5* flash05
-# mne_flash_bem --noflash30
-# """
-#
-#         meshfix_opts = ' -u 10 --vertices {:d} --fsmesh'.format(n_vertices)
-#         bem_dir = os.path.join(m2m_outputs['fs_dir'], 'bem')
-#         bem_surfaces = dict(inner_skull='csf.stl',
-#                             outer_skull='skull.stl',
-#                             outer_skin='skin.stl')
-#         for bem_layer, surf in bem_surfaces.items():
-#             surf_fname = os.path.join(m2m_outputs['m2m_dir'], surf)
-#             if not check_source_readable(surf_fname):
-#                 raise RuntimeError(
-#                     'Could not find surface {surf:s}; mri2mesh may have exited'
-#                     ' with an error, please check.'.format(surf=surf))
-#             bem_fname = os.path.join(bem_dir, bem_layer)
-#
-#             cmds = ['meshfix {sfn:s} {mfo:s} -o {bfn:s}'
-#                     .format(sfn=surf_fname, mfo=meshfix_opts, bfn=bem_fname)]
-#
-#             xfm_volume = os.path.join(m2m_outputs['m2m_dir'], 'tmp',
-#                                       'subcortical_FS.nii.gz')
-#             xfm = os.path.join(m2m_outputs['m2m_dir'], 'tmp', 'unity.xfm')
-#
-#             # NB This is needed! Otherwise the stl->fsmesh conversion output
-#             # lacks some transformation and is misaligned with the MR
-#             cmds += ['mris_transform --dst {xv:s} --src {xv:s} '
-#                      '{bfn:s}.fsmesh {xfm:s} {bfn:s}.surf'
-#                      .format(xv=xfm_volume, bfn=bem_fname, xfm=xfm)]
-#             cmds += ['rm {bfn:s}.fsmesh'.format(bfn=bem_fname)]
-#
-#         # One job per subject, since these are "cheap" operations
-#         self.add_job(cmds, job_name='meshfix',
-#                      working_dir=self.info['output_dir'],
-#                      **job_options)
 
 
 # NB This is a modified version of that found in mne-python/mne/bem.py
