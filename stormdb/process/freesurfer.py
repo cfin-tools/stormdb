@@ -330,10 +330,9 @@ class Freesurfer(ClusterBatch):
         flash_dir = op.join(mri_dir, 'flash')
         flash_dcm = op.join(flash_dir, 'dicom')  # same for 5 and 30!
 
-        if os.isdir(flash_dcm):
+        if op.isdir(flash_dcm):
             warn('Copy of FLASH image DICOMs found. Submitting this script '
                  'will overwrite previous surfaces.')
-            cmd = add_to_command(cmd, 'rm -rf {}/*', flash_dir)
 
         cmd = add_to_command(cmd, 'mkdir -p {}', flash_dcm)
         cmd = add_to_command(cmd, 'cp {}/* {}', series[0]['path'], flash_dcm)
