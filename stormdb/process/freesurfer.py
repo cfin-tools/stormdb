@@ -605,7 +605,9 @@ def convert_flash_mris_cfin(subject, flash30=False, n_echos=8,
             files = glob.glob("mef05*u.mgz")
         else:
             files = glob.glob("mef05*.mgz")
-        cmd = ['mri_average', '-noconform', files, 'flash5.mgz']
+        cmd = ['mri_average', '-noconform']
+        cmd.extend(files)
+        cmd.append('flash5.mgz')
         run_subprocess(cmd, env=env, stdout=sys.stdout,
                        stderr=sys.stderr)
         if op.exists('flash5_reg.mgz'):
