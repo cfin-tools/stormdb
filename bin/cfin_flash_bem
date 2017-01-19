@@ -83,7 +83,7 @@ def run():
 
     flash_dir = op.join(os.getcwd(), 'flash05')
     n_echos = len([name for name in os.listdir(flash_dir) if
-        op.isdir(op.join(flash_dir, name))])
+                  op.isdir(op.join(flash_dir, name))])
 
     convert_flash_mris_cfin(subject=subject, subjects_dir=subjects_dir,
                             flash30=flash30, n_echos=n_echos, unwarp=unwarp)

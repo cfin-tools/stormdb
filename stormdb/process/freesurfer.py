@@ -12,9 +12,9 @@ import os.path as op
 import subprocess as subp
 import shutil
 import glob
-import sys
 
 from six import string_types
+from warnings import warn
 
 from .utils import first_file_in_dir, make_copy_of_dicom_dir
 from ..base import (enforce_path_exists, check_source_readable,
@@ -322,7 +322,6 @@ class Freesurfer(ClusterBatch):
 
         cmd = None
 
-        # self.logger.info('Copying DICOM FLASH data for speed...')
         series = _get_unique_series(Query(self.proj_name), flash5,
                                     subject, 'MR')
         flash5_name = '{:03d}_{:s}'.format(int(series[0]['serieno']),
@@ -331,7 +330,11 @@ class Freesurfer(ClusterBatch):
         flash_dir = op.join(mri_dir, 'flash')
         flash_dcm = op.join(flash_dir, 'dicom')  # same for 5 and 30!
 
-#        make_copy_of_dicom_dir(series[0]['path'], flash_dcm)
+        if os.isdir(flash_dcm):
+            warn('Copy of FLASH image DICOMs found. Submitting this script '
+                 'will overwrite previous surfaces.')
+            cmd = add_to_command(cmd, 'rm -rf {}/*', flash_dir)
+
         cmd = add_to_command(cmd, 'mkdir -p {}', flash_dcm)
         cmd = add_to_command(cmd, 'cp {}/* {}', series[0]['path'], flash_dcm)
 
@@ -342,9 +345,8 @@ class Freesurfer(ClusterBatch):
             cmd = add_to_command(cmd, 'cp {}/* {}',
                                  series[0]['path'], flash_dcm)
 
-        # self.logger.info('Running mne_organize_dicom...')
-#        cmd = add_to_command(cmd, 'cd {}; mne_organize_dicom {}',
-#                             flash_dir, flash_dcm)
+        cmd = add_to_command(cmd, 'cd {}; mne_organize_dicom {}',
+                             flash_dir, flash_dcm)
 
         cmd = add_to_command(cmd, 'rm flash05; ln -s {} flash05', flash5_name)
 
@@ -354,11 +356,12 @@ class Freesurfer(ClusterBatch):
             flash30_str = ' --noflash30'
 
         cmd = add_to_command(cmd, ('cfin_flash_bem -s {sub:s} -d {subdir:s}'
-                                   '{f30_str:s}'),
+                                   '{f30_str:s} --overwrite'),
                              sub=subject_dir, subdir=self.info['subjects_dir'],
                              f30_str=flash30_str)
 
-        self.add_job(cmd, job_name='cfin_flash_bem', cleanup=False, **job_options)
+        self.add_job(cmd, job_name='cfin_flash_bem',
+                     cleanup=True, **job_options)
 
     def _create_bem_surfaces_watershed(self, subject, analysis_name=None,
                                        atlas=False, gcaatlas=False,
