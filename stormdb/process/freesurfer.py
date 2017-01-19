@@ -330,9 +330,10 @@ class Freesurfer(ClusterBatch):
         flash_dir = op.join(mri_dir, 'flash')
         flash_dcm = op.join(flash_dir, 'dicom')  # same for 5 and 30!
 
-        if op.isdir(flash_dcm):
+        if os.isdir(flash_dcm):
             warn('Copy of FLASH image DICOMs found. Submitting this script '
                  'will overwrite previous surfaces.')
+            cmd = add_to_command(cmd, 'rm -rf {}/*', flash_dir)
 
         cmd = add_to_command(cmd, 'mkdir -p {}', flash_dcm)
         cmd = add_to_command(cmd, 'cp {}/* {}', series[0]['path'], flash_dcm)
@@ -340,8 +341,7 @@ class Freesurfer(ClusterBatch):
         if flash30 is not None:
             series = _get_unique_series(Query(self.proj_name), flash30,
                                         subject, 'MR')
-            flash30_name = '{:03d}_{:s}'.format(int(series[0]['serieno']),
-                                                series[0]['seriename'])
+            flash30_name = series[0]['seriename']
             cmd = add_to_command(cmd, 'cp {}/* {}',
                                  series[0]['path'], flash_dcm)
 
@@ -350,10 +350,10 @@ class Freesurfer(ClusterBatch):
 
         cmd = add_to_command(cmd, 'rm flash05; ln -s {} flash05', flash5_name)
 
-        flash30_str = ' --noflash30'
+        flash30_str = ''
         if flash30 is not None:
             cmd = add_to_command(cmd, 'ln -s {} flash30', flash30_name)
-            flash30_str = ''
+            flash30_str = ' --noflash30'
 
         cmd = add_to_command(cmd, ('cfin_flash_bem -s {sub:s} -d {subdir:s}'
                                    '{f30_str:s} --overwrite'),
@@ -505,9 +505,9 @@ def convert_flash_mris_cfin(subject, flash30=False, n_echos=8,
     should be, as usual, in the subject's mri directory.
     """
 
-    if n_echos < 3:
+    if n_echos < 5:
         raise ValueError(
-            'Less than 3 echos are currently not supported.')
+            'Less than 5 echos are currently not supported.')
     elif flash30 and n_echos != 8:
         raise ValueError(
             'When using the 30 degree sequence, exactly 8 echos must be used')
@@ -598,12 +598,11 @@ def convert_flash_mris_cfin(subject, flash30=False, n_echos=8,
             print("Synthesized flash 5 volume is already there")
     else:
         print("\n---- Averaging flash5 echoes ----")
-        # This must be an mne-python BUG!
-        # os.chdir('parameter_maps')
+        os.chdir('parameter_maps')
         if unwarp:
-            files = glob.glob("mef05*u.mgz")
+            files = glob.glob("../mef05*u.mgz")
         else:
-            files = glob.glob("mef05*.mgz")
+            files = glob.glob("../mef05*.mgz")
         cmd = ['mri_average', '-noconform'] + files + ['flash5.mgz']
         _run_subprocess(cmd, stderr=subp.STDOUT, shell=True)
         if op.exists('flash5_reg.mgz'):
