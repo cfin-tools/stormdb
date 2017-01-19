@@ -316,9 +316,9 @@ class Freesurfer(ClusterBatch):
                                    job_options=dict(queue='short.q',
                                                     n_threads=1)):
         """Create BEMs for single subject."""
-        subject_dir = subject
+        subject_dirname = subject
         if analysis_name is not None:
-            subject_dir += analysis_name
+            subject_dirname += analysis_name
 
         cmd = None
 
@@ -326,7 +326,7 @@ class Freesurfer(ClusterBatch):
                                     subject, 'MR')
         flash5_name = '{:03d}_{:s}'.format(int(series[0]['serieno']),
                                            series[0]['seriename'])
-        mri_dir = op.join(self.info['subjects_dir'], subject_dir, 'mri')
+        mri_dir = op.join(self.info['subjects_dir'], subject_dirname, 'mri')
         flash_dir = op.join(mri_dir, 'flash')
         flash_dcm = op.join(flash_dir, 'dicom')  # same for 5 and 30!
 
@@ -356,14 +356,18 @@ class Freesurfer(ClusterBatch):
 
         cmd = add_to_command(cmd, ('cfin_flash_bem -s {sub:s} -d {subdir:s}'
                                    '{f30_str:s} --overwrite'),
-                             sub=subject_dir, subdir=self.info['subjects_dir'],
-                             f30_str=flash30_str)
+                             sub=subject_dirname, f30_str=flash30_str,
+                             subdir=self.info['subjects_dir'])
+
+        if make_coreg_head:
+            bem_dir = op.join(mri_dir, 'bem')
+            cmd = make_coreg_head_commands(bem_dir, subject_dirname, cmd=cmd)
 
         self.add_job(cmd, job_name='cfin_flash_bem',
                      cleanup=True, **job_options)
 
     def _create_bem_surfaces_watershed(self, subject, analysis_name=None,
-                                       atlas=False, gcaatlas=False,
+                                       atlas=False, gcaatlas=True,
                                        make_coreg_head=False,
                                        job_options=dict(queue='short.q',
                                                         n_threads=1)):
@@ -382,37 +386,29 @@ class Freesurfer(ClusterBatch):
         else:
             atlas_str = ''
 
-        self.logger.info('Running mne_watershed_bem...')
-        ws_cmd = ['mne_watershed_bem --subject {sub:s} {atl:s} '
-                  '--overwrite'.format(sub=subject_dirname, atl=atlas_str)]
+        # self.logger.info('Running mne_watershed_bem...')
+        cmd = None
+
+        # Just in case: commands below are dependent on it set in environ
+        cmd = add_to_command(cmd, 'export SUBJECTS_DIR={}',
+                             self.info['subjects_dir'])
+
+        cmd = add_to_command(cmd, ('mne_watershed_bem --subject {sub:s} '
+                             ' {atl:s} --overwrite'), sub=subject_dirname,
+                             atl=atlas_str)
 
         bem_dir = op.join(self.info['subjects_dir'], subject_dirname, 'bem')
         surf_names = ('inner_skull', 'outer_skull', 'outer_skin')
-        ln_cmds = []
         for sn in surf_names:
             surf_fname = op.join(bem_dir, sn + '.surf')
-            ln_cmds += ['ln -s watershed/{}_{}_surface {}'
-                        .format(subject_dirname, sn, surf_fname)]
+            cmd = add_to_command(cmd, ('ln -s watershed/{}_{}_surface {}'),
+                                 subject_dirname, sn, surf_fname)
 
         if make_coreg_head:
-            head_cmds = []
-            head_cmds = ['cd {}; mkheadsurf -subjid {}'.format(bem_dir,
-                                                               subject_dirname)]
-            head_cmds += ['mne_surf2bem --surf ../surf/lh.seghead --id 4 '
-                          '--check --fif {}-head-dense.fif'
-                          .format(subject_dirname)]
-            head_cmds += ['rm -f {sub:s}-head.fif;'
-                          'ln -s {sub:s}-head-dense.fif {sub:s}-head.fif'
-                          .format(sub=subject_dirname)]
+            cmd = make_coreg_head_commands(bem_dir, subject_dirname, cmd=cmd)
 
-        cmd = ' ;\n'.join(ws_cmd + ln_cmds + head_cmds)
-
-        # Just in case: commands below are dependent on it set in environ
-        cmd = ('export SUBJECTS_DIR={} ;\n'
-               .format(self.info['subjects_dir'])) + cmd
-
-        # NB CLUSTERISE!
-        _run_subprocess(cmd, stderr=subp.STDOUT, shell=True)
+        self.add_job(cmd, job_name='watershed_bem',
+                     cleanup=True, **job_options)
 
 
 #     cmd = '''
@@ -609,6 +605,19 @@ def convert_flash_mris_cfin(subject, flash30=False, n_echos=8,
 
     # Go back to initial directory
     os.chdir(curdir)
+
+
+def make_coreg_head_commands(bem_dir, subject_dirname, cmd=None):
+
+    cmd = add_to_command(cmd, 'cd {}; mkheadsurf -subjid {}',
+                         bem_dir, subject_dirname)
+    cmd = add_to_command(cmd, ('mne_surf2bem --surf ../surf/lh.seghead '
+                         '--id 4 --check --fif {}-head-dense.fif'),
+                         subject_dirname)
+    cmd = add_to_command(cmd, ('rm -f {sub:s}-head.fif;'
+                         'ln -s {sub:s}-head-dense.fif {sub:s}-head.fif'),
+                         sub=subject_dirname)
+    return cmd
 
 
 def _prepare_env(subject, subjects_dir, requires_freesurfer, requires_mne):
