@@ -411,7 +411,7 @@ class Freesurfer(ClusterBatch):
                              sub=subject_dirname, atl=atlas_str)
 
         bem_dir = op.join(self.info['subjects_dir'], subject_dirname, 'bem')
-        surf_names = ('inner_skull', 'outer_skull', 'outer_skin')
+        surf_names = ('inner_skull',)
         for sn in surf_names:
             surf_fname = op.join(bem_dir, sn + '.surf')
             cmd = add_to_command(cmd, ('ln -s watershed/{}_{}_surface {}'),
