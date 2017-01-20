@@ -370,8 +370,8 @@ class Freesurfer(ClusterBatch):
             cmd = add_to_command(cmd,
                                  ('mne_convert_surface --tri {tri:s} '
                                   ' --surfout {surf:s} --swap --mghmri ',
-                                  '{f5reg:s}'), tri=tri_fname, surf=surf_fname,
-                                 f5reg=flash5_reg)
+                                  '{flreg:s}'), tri=tri_fname, surf=surf_fname,
+                                 flreg=flash5_reg)
         if make_coreg_head:
             cmd = make_coreg_head_commands(bem_dir, subject_dirname, cmd=cmd)
 
