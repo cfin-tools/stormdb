@@ -36,7 +36,7 @@ QSUB_SCHEMA = """
 export OMP_NUM_THREADS=$NSLOTS
 
 echo "Executing following command on $NSLOTS threads:"
-echo -e {exec_cmd:s}
+echo -e "{exec_cmd:s}"
 
 {exec_cmd:s}  # remember to escape quotes on command-liners!
 
@@ -214,7 +214,7 @@ class ClusterJob(object):
                 raise RuntimeError('Each element of the command list should '
                                    'be a single string.')
             else:
-                self._cmd = ';'.join(value)
+                self._cmd = '\n'.join(value)
         elif not isinstance(value, string_types):
             raise RuntimeError('Command should be a single string.')
         else:

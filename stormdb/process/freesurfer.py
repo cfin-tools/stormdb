@@ -344,10 +344,10 @@ class Freesurfer(ClusterBatch):
             cmd = add_to_command(cmd, 'cp {}/* {}',
                                  series[0]['path'], flash_dcm)
 
-        cmd = add_to_command(cmd, 'cd {}; mne_organize_dicom {}',
+        cmd = add_to_command(cmd, 'cd {} && mne_organize_dicom {}',
                              flash_dir, flash_dcm)
 
-        cmd = add_to_command(cmd, 'rm flash05; ln -s {} flash05', flash5_name)
+        cmd = add_to_command(cmd, 'rm -f flash05 && ln -s {} flash05', flash5_name)
 
         flash30_str = ' --noflash30'
         if flash30 is not None:
@@ -360,11 +360,10 @@ class Freesurfer(ClusterBatch):
                              subdir=self.info['subjects_dir'])
 
         if make_coreg_head:
-            bem_dir = op.join(mri_dir, 'bem')
+            bem_dir = op.join(mri_dir, '../bem')
             cmd = make_coreg_head_commands(bem_dir, subject_dirname, cmd=cmd)
 
-        self.add_job(cmd, job_name='cfin_flash_bem',
-                     cleanup=True, **job_options)
+        self.add_job(cmd, job_name='cfin_flash_bem', **job_options)
 
     def _create_bem_surfaces_watershed(self, subject, analysis_name=None,
                                        atlas=False, gcaatlas=True,
@@ -409,8 +408,7 @@ class Freesurfer(ClusterBatch):
         if make_coreg_head:
             cmd = make_coreg_head_commands(bem_dir, subject_dirname, cmd=cmd)
 
-        self.add_job(cmd, job_name='watershed_bem',
-                     cleanup=True, **job_options)
+        self.add_job(cmd, job_name='watershed_bem', **job_options)
 
 
 # NB This is a modified version of that found in mne-python/mne/bem.py
@@ -546,12 +544,12 @@ def convert_flash_mris_cfin(subject, flash30=False, n_echos=8,
 
 def make_coreg_head_commands(bem_dir, subject_dirname, cmd=None):
 
-    cmd = add_to_command(cmd, 'cd {}; mkheadsurf -subjid {}',
+    cmd = add_to_command(cmd, 'cd {} && mkheadsurf -subjid {}',
                          bem_dir, subject_dirname)
     cmd = add_to_command(cmd, ('mne_surf2bem --surf ../surf/lh.seghead '
                          '--id 4 --check --fif {}-head-dense.fif'),
                          subject_dirname)
-    cmd = add_to_command(cmd, ('rm -f {sub:s}-head.fif;'
+    cmd = add_to_command(cmd, ('rm -f {sub:s}-head.fif && '
                          'ln -s {sub:s}-head-dense.fif {sub:s}-head.fif'),
                          sub=subject_dirname)
     return cmd

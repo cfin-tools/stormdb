@@ -36,7 +36,7 @@ Before running this script do the following:
 
 Example usage:
 
-$ mne flash_bem --subject sample
+$ cfin_flash_bem --subject sample
 """
 from __future__ import print_function
 
@@ -46,50 +46,42 @@ import os
 import os.path as op
 from mne.bem import make_flash_bem
 from stormdb.process import convert_flash_mris_cfin
+from argparse import ArgumentParser
 
+parser = ArgumentParser()
 
-def run():
-    """Run command."""
-    from mne.commands.utils import get_optparser
+parser.add_argument("-s", "--subject", dest="subject",
+                  help="Subject name", default=None)
+parser.add_argument("-d", "--subjects-dir", dest="subjects_dir",
+                  help="Subjects directory", default=None)
+parser.add_argument("-3", "--noflash30", dest="noflash30",
+                  action="store_true", default=False,
+                  help=("Skip the 30-degree flip angle data"),)
+parser.add_argument("-u", "--unwarp", dest="unwarp",
+                  action="store_true", default=False,
+                  help=("Run grad_unwarp with -unwarp <type> option on "
+                        "each of the converted data sets"))
+parser.add_argument("-o", "--overwrite", dest="overwrite",
+                  action="store_true", default=False,
+                  help="Write over existing .surf files in bem folder")
 
-    parser = get_optparser(__file__)
+options = parser.parse_args()
 
-    parser.add_option("-s", "--subject", dest="subject",
-                      help="Subject name", default=None)
-    parser.add_option("-d", "--subjects-dir", dest="subjects_dir",
-                      help="Subjects directory", default=None)
-    parser.add_option("-3", "--noflash30", dest="noflash30",
-                      action="store_true", default=False,
-                      help=("Skip the 30-degree flip angle data"),)
-    parser.add_option("-u", "--unwarp", dest="unwarp",
-                      action="store_true", default=False,
-                      help=("Run grad_unwarp with -unwarp <type> option on "
-                            "each of the converted data sets"))
-    parser.add_option("-o", "--overwrite", dest="overwrite",
-                      action="store_true", default=False,
-                      help="Write over existing .surf files in bem folder")
+subject = options.subject
+subjects_dir = options.subjects_dir
+flash30 = not options.noflash30
+unwarp = options.unwarp
+overwrite = options.overwrite
 
-    options, args = parser.parse_args()
+if options.subject is None:
+    parser.print_help()
+    raise RuntimeError('The subject argument must be set')
 
-    subject = options.subject
-    subjects_dir = options.subjects_dir
-    flash30 = not options.noflash30
-    unwarp = options.unwarp
-    overwrite = options.overwrite
+flash_dir = op.join(os.getcwd(), 'flash05')
+n_echos = len([name for name in os.listdir(flash_dir) if
+              op.isdir(op.join(flash_dir, name))])
 
-    if options.subject is None:
-        parser.print_help()
-        raise RuntimeError('The subject argument must be set')
-
-    flash_dir = op.join(os.getcwd(), 'flash05')
-    n_echos = len([name for name in os.listdir(flash_dir) if
-                  op.isdir(op.join(flash_dir, name))])
-
-    convert_flash_mris_cfin(subject=subject, subjects_dir=subjects_dir,
-                            flash30=flash30, n_echos=n_echos, unwarp=unwarp)
-    make_flash_bem(subject=subject, subjects_dir=subjects_dir,
-                   overwrite=overwrite, show=False, flash_path=None)
-
-is_main = (__name__ == '__main__')
-if is_main:
-    run()
+convert_flash_mris_cfin(subject=subject, subjects_dir=subjects_dir,
+                        flash30=flash30, n_echos=n_echos, unwarp=unwarp)
+make_flash_bem(subject=subject, subjects_dir=subjects_dir,
+               overwrite=overwrite, show=False, flash_path=None)
