@@ -365,8 +365,8 @@ class Freesurfer(ClusterBatch):
         surf_names = ('inner_skull', 'outer_skull', 'outer_skin')
         flash5_reg = op.join(flash_dir, 'parameter_maps', 'flash5_reg.mgz')
         for sn in surf_names:
-            tri_fname = op.join(bem_dir, sn + '.tri')
-            surf_fname = op.join(bem_dir, sn + '.surf')
+            tri_fname = op.join(bem_dir, 'flash', sn + '.tri')
+            surf_fname = op.join(bem_dir, 'flash', sn + '.surf')
             cmd = add_to_command(cmd,
                                  ('mne_convert_surface --tri {tri:s} '
                                   ' --surfout {surf:s} --swap --mghmri '
