@@ -326,6 +326,7 @@ class Freesurfer(ClusterBatch):
                                     subject, 'MR')
         flash5_name = '{:03d}_{:s}'.format(int(series[0]['serieno']),
                                            series[0]['seriename'])
+        bem_dir = op.join(self.info['subjects_dir'], subject_dirname, 'bem')
         mri_dir = op.join(self.info['subjects_dir'], subject_dirname, 'mri')
         flash_dir = op.join(mri_dir, 'flash')
         flash_dcm = op.join(flash_dir, 'dicom')  # same for 5 and 30!
@@ -347,7 +348,8 @@ class Freesurfer(ClusterBatch):
         cmd = add_to_command(cmd, 'cd {} && mne_organize_dicom {}',
                              flash_dir, flash_dcm)
 
-        cmd = add_to_command(cmd, 'rm -f flash05 && ln -s {} flash05', flash5_name)
+        cmd = add_to_command(cmd, 'rm -f flash05 && ln -s {} flash05',
+                             flash5_name)
 
         flash30_str = ' --noflash30'
         if flash30 is not None:
@@ -359,8 +361,18 @@ class Freesurfer(ClusterBatch):
                              sub=subject_dirname, f30_str=flash30_str,
                              subdir=self.info['subjects_dir'])
 
+        # NB mne/bem.py:make_flash_bem seems to be missing this step!
+        surf_names = ('inner_skull', 'outer_skull', 'outer_skin')
+        flash5_reg = op.join(flash_dir, 'parameter_maps', 'flash5_reg.mgz')
+        for sn in surf_names:
+            tri_fname = op.join(bem_dir, sn + '.tri')
+            surf_fname = op.join(bem_dir, sn + '.surf')
+            cmd = add_to_command(cmd,
+                                 ('mne_convert_surface --tri {tri:s} '
+                                  ' --surfout {surf:s} --swap --mghmri ',
+                                  '{f5reg:s}'), tri=tri_fname, surf=surf_fname,
+                                 f5reg=flash5_reg)
         if make_coreg_head:
-            bem_dir = op.join(mri_dir, '../bem')
             cmd = make_coreg_head_commands(bem_dir, subject_dirname, cmd=cmd)
 
         self.add_job(cmd, job_name='cfin_flash_bem', **job_options)
