@@ -243,8 +243,8 @@ class Freesurfer(ClusterBatch):
         make_coreg_head : bool
             If True (default), make a high-resolution head (outer skin) surface
             for MEG/EEG coregistration purposes. NB: The number of vertices is
-            currently hard-coded to be 20,000; this is arbitrary though, and
-            could be made more or less depending on needs.
+            currently extremely high: around 350,000; raise an Issue on
+            GitHub if this is a problem.
         analysis_name : str | None
             Optional suffix to add to subject name (e.g. '_with_t2mask')
         job_options : dict

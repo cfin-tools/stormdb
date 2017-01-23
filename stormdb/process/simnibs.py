@@ -14,7 +14,7 @@ from six import string_types
 from warnings import warn
 from .utils import convert_dicom_to_nifti
 from ..base import (enforce_path_exists, check_source_readable,
-                    _get_unique_series, mkdir_p)
+                    _get_unique_series, mkdir_p, add_to_command)
 from ..access import Query
 from ..cluster import ClusterBatch
 
@@ -262,7 +262,7 @@ class SimNIBS(ClusterBatch):
                      job_name='mri2mesh', **job_options)
 
     def create_bem_surfaces(self, subject, n_vertices=5120,
-                            analysis_name=None,
+                            analysis_name=None, make_coreg_head=True,
                             job_options=dict(queue='short.q', n_threads=1)):
         """Convert mri2mesh output to Freesurfer meshes suitable for BEMs.
 
@@ -278,6 +278,11 @@ class SimNIBS(ClusterBatch):
             (default: 5120).
         analysis_name : str | None
             Optional suffix to add to subject name (e.g. '_with_t2mask')
+        make_coreg_head : bool
+            If True (default), make a high-resolution head (outer skin) surface
+            for MEG/EEG coregistration purposes. NB: The number of vertices is
+            currently determined by the mri2mesh-parameter NUMBER_OF_VERTICES,
+            which is set to about 60,000. This could be made higher, if needed.
         job_options : dict
             Dictionary of optional arguments to pass to ClusterJob. The
             default set here is: job_options=dict(queue='short.q', n_threads=1)
@@ -296,6 +301,7 @@ class SimNIBS(ClusterBatch):
             try:
                 self._create_bem_surfaces(sub, n_vertices=n_vertices,
                                           analysis_name=analysis_name,
+                                          make_coreg_head=True,
                                           job_options=job_options)
             except:
                 self._joblist = []  # evicerate on error
@@ -305,7 +311,7 @@ class SimNIBS(ClusterBatch):
                          .format(len(self._joblist)))
 
     def _create_bem_surfaces(self, subject, n_vertices=5120,
-                             analysis_name=None,
+                             analysis_name=None, make_coreg_head=True,
                              job_options=dict(queue='short.q', n_threads=1)):
         "Create BEMs for single subject."
         if subject not in self.info['valid_subjects']:
@@ -350,6 +356,16 @@ class SimNIBS(ClusterBatch):
                      '{bfn:s}.fsmesh {xfm:s} {bfn:s}.surf'
                      .format(xv=xfm_volume, bfn=bem_fname, xfm=xfm)]
             cmds += ['rm {bfn:s}.fsmesh'.format(bfn=bem_fname)]
+
+        if make_coreg_head:
+            cmd = add_to_command(cmd, 'cd {} && mkheadsurf -subjid {}',
+                                 bem_dir, subject_dirname)
+            cmd = add_to_command(cmd, ('mne_surf2bem --surf ../surf/lh.seghead '
+                                 '--id 4 --check --fif {}-head-dense.fif'),
+                                 subject_dirname)
+            cmd = add_to_command(cmd, ('rm -f {sub:s}-head.fif && '
+                                 'ln -s {sub:s}-head-dense.fif {sub:s}-head.fif'),
+                                 sub=subject_dirname)
 
         # One job per subject, since these are "cheap" operations
         self.add_job(cmds, job_name='meshfix',
