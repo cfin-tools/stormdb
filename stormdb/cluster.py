@@ -64,6 +64,7 @@ class Cluster(object):
         self._highmem_qs = ['highmem.q']
 
     def _query(self, cmd):
+        """Return list of outputs from a shell call"""
         try:
             output = subp.check_output([cmd],
                                        stderr=subp.STDOUT, shell=True)
@@ -72,8 +73,11 @@ class Cluster(object):
                                'output is:\n\n{:s}'.format(cmd,
                                                            cpe.returncode,
                                                            cpe.output))
-        output = output.rstrip()
-        return(output.split('\n'))
+        # NB the decode-step here is important: in Py3, check_output
+        # returns a byte-string! This is tested to work on Py2
+        output = output.decode('ascii', 'ignore')
+        # first strip whitespace (incl. \n), then split on newline
+        return(output.rstrip().split('\n'))
 
     @property
     def queues(self):
