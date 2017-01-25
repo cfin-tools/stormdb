@@ -281,8 +281,7 @@ class SimNIBS(ClusterBatch):
         make_coreg_head : bool
             If True (default), make a high-resolution head (outer skin) surface
             for MEG/EEG coregistration purposes. NB: The number of vertices is
-            currently determined by the mri2mesh-parameter NUMBER_OF_VERTICES,
-            which is set to about 60,000. This could be made higher, if needed.
+            currently fixed at 30,000. This could be made higher, if needed.
         job_options : dict
             Dictionary of optional arguments to pass to ClusterJob. The
             default set here is: job_options=dict(queue='short.q', n_threads=1)
@@ -373,19 +372,27 @@ class SimNIBS(ClusterBatch):
                                  mne_surf=mne_surf, fsmesh=bem_fname)
 
             if make_coreg_head and bem_layer == 'outer_skin':
+                COREG_VERTICES = 30000
+                coreg_opts = ('-u 10 --vertices {:d} --fsmesh'
+                              .format(COREG_VERTICES))
                 head_fname = op.join(bem_dir,
-                                     m2m_outputs['subject'] + '-head')
+                                     m2m_outputs['subject'] + '-head-dense')
                 # get the highres skin-surface and transform it
                 cmd = add_to_command(cmd,
+                                     'meshfix {sfn:s} {cro:s} -o {hfn:s}',
+                                     sfn=surf_fname, cro=coreg_opts,
+                                     hfn=head_fname)
+                cmd = add_to_command(cmd,
                                      ('mris_transform --dst {xv:s} --src '
-                                      '{xv:s} {sfn:s} {xfm:s} {head_surf:s}'),
-                                     xv=xfm_volume, sfn=surf_fname, xfm=xfm,
-                                     head_surf=head_fname + '-dense.surf')
+                                      '{xv:s} {hfn:s} {xfm:s} {head_surf:s}'),
+                                     xv=xfm_volume, xfm=xfm,
+                                     hfn=head_fname + '.fsmesh',
+                                     head_surf=head_fname + '.surf')
                 cmd = add_to_command(cmd,
                                      ('mne_surf2bem --surf {skin_surf:s} '
                                       '--id 4 --check --fif {head_fif:s}'),
-                                     skin_surf=bem_fname + '-dense.surf',
-                                     head_fif=head_fname + '-dense.fif')
+                                     skin_surf=head_fname + '.surf',
+                                     head_fif=head_fname + '.fif')
                 cmd = add_to_command(cmd, ('rm -f {head_fname:s}.fif && '
                                            'ln -s {head_fname:s}-dense.fif '
                                            '{head_fname:s}-head.fif'),
