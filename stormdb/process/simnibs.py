@@ -348,7 +348,7 @@ class SimNIBS(ClusterBatch):
 
         cmd = None
         for bem_layer, surf in bem_surfaces.items():
-            surf_fname = op.join(simnibs_bem_dir, surf)
+            surf_fname = op.join(m2m_outputs['m2m_dir'], surf)
             if not check_source_readable(surf_fname):
                 raise RuntimeError(
                     'Could not find surface {surf:s}; mri2mesh may have exited'
