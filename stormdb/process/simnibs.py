@@ -332,29 +332,34 @@ class SimNIBS(ClusterBatch):
 
         meshfix_opts = ' -u 10 --vertices {:d} --fsmesh'.format(n_vertices)
         bem_dir = op.join(m2m_outputs['fs_dir'], 'bem')
+        simnibs_bem_dir = op.join(bem_dir, 'simnibs')
+        mkdir_p(simnibs_bem_dir)
+        # these are the super-high-resolution main outputs
         bem_surfaces = dict(inner_skull='csf.stl',
                             outer_skull='skull.stl',
                             outer_skin='skin.stl')
 
+        # NB This is needed when starting from stl-files
+        # Otherwise the stl->fsmesh conversion output
+        # lacks some transformation and is misaligned with the MR
+        xfm_volume = op.join(m2m_outputs['m2m_dir'], 'tmp',
+                             'subcortical_FS.nii.gz')
+        xfm = op.join(m2m_outputs['m2m_dir'], 'tmp', 'unity.xfm')
+
         cmd = None
         for bem_layer, surf in bem_surfaces.items():
-            surf_fname = op.join(m2m_outputs['m2m_dir'], surf)
+            surf_fname = op.join(simnibs_bem_dir, surf)
             if not check_source_readable(surf_fname):
                 raise RuntimeError(
                     'Could not find surface {surf:s}; mri2mesh may have exited'
-                    ' with an error, please check.'.format(surf=surf))
-            bem_fname = op.join(bem_dir, bem_layer)
+                    ' with an error, please check.'.format(surf=surf_fname))
+            # this is without suffix
+            bem_fname = op.join(simnibs_bem_dir, bem_layer)
 
             cmd = add_to_command(cmd, 'meshfix {sfn:s} {mfo:s} -o {bfn:s}',
                                  sfn=surf_fname, mfo=meshfix_opts,
                                  bfn=bem_fname)
 
-            xfm_volume = op.join(m2m_outputs['m2m_dir'], 'tmp',
-                                 'subcortical_FS.nii.gz')
-            xfm = op.join(m2m_outputs['m2m_dir'], 'tmp', 'unity.xfm')
-
-            # NB This is needed! Otherwise the stl->fsmesh conversion output
-            # lacks some transformation and is misaligned with the MR
             cmd = add_to_command(cmd,
                                  ('mris_transform --dst {xv:s} --src {xv:s} '
                                   '{bfn:s}.fsmesh {xfm:s} {bfn:s}.surf'),
@@ -362,24 +367,31 @@ class SimNIBS(ClusterBatch):
             # remove the low-res, non-coregistered surface mesh
             cmd = add_to_command(cmd, 'rm {bfn:s}.fsmesh', bfn=bem_fname)
 
-        if make_coreg_head:
-            head_fname = op.join(bem_dir,
-                                 m2m_outputs['subject'] + '-head')
-            # get the highres skin-surface and transform it
-            cmd = add_to_command(cmd,
-                                 ('mris_transform --dst {xv:s} --src {xv:s} '
-                                  '{sfn:s} {xfm:s} {head_surf:s}'),
-                                 xv=xfm_volume, sfn=surf_fname, xfm=xfm,
-                                 head_surf=head_fname + '-dense.surf')
-            cmd = add_to_command(cmd,
-                                 ('mne_surf2bem --surf {head_surf:s} '
-                                  '--id 4 --check --fif {head_fif:s}'),
-                                 head_surf=head_fname + '-dense.surf',
-                                 head_fif=head_fname + '-dense.fif')
-            cmd = add_to_command(cmd, ('rm -f {head_fname:s}.fif && '
-                                       'ln -s {head_fname:s}-dense.fif '
-                                       '{head_fname:s}-head.fif'),
-                                 head_fname=head_fname)
+            mne_surf = op.join(bem_dir, bem_layer + '.surf')
+            cmd = add_to_command(cmd, ('rm -f {mne_surf:s} && '
+                                       'ln -s {fsmesh:s} {mne_surf:s}'),
+                                 mne_surf=mne_surf, fsmesh=bem_fname)
+
+            if make_coreg_head and bem_layer == 'outer_skin':
+                skin_fname = op.join(m2m_outputs['m2m_dir'], 'tmp',
+                                     'skin.off')  # this is about 60k vertices
+                head_fname = op.join(bem_dir,
+                                     m2m_outputs['subject'] + '-head')
+                # get the highres skin-surface and transform it
+                cmd = add_to_command(cmd,
+                                     ('mris_transform --dst {xv:s} --src '
+                                      '{xv:s} {sfn:s} {xfm:s} {head_surf:s}'),
+                                     xv=xfm_volume, sfn=skin_fname, xfm=xfm,
+                                     head_surf=head_fname + '-dense.surf')
+                cmd = add_to_command(cmd,
+                                     ('mne_surf2bem --surf {skin_surf:s} '
+                                      '--id 4 --check --fif {head_fif:s}'),
+                                     skin_surf=bem_fname + '-dense.surf',
+                                     head_fif=head_fname + '-dense.fif')
+                cmd = add_to_command(cmd, ('rm -f {head_fname:s}.fif && '
+                                           'ln -s {head_fname:s}-dense.fif '
+                                           '{head_fname:s}-head.fif'),
+                                     head_fname=head_fname)
 
         # One job per subject, since these are "cheap" operations
         self.add_job(cmd, job_name='meshfix',
