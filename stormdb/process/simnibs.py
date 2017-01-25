@@ -10,6 +10,7 @@ http://www.simnibs.de
 #
 # License: BSD (3-clause)
 import os
+import os.path as op
 from six import string_types
 from warnings import warn
 from .utils import convert_dicom_to_nifti
@@ -190,13 +191,13 @@ class SimNIBS(ClusterBatch):
         if isinstance(link_to_fs_dir, string_types):
             link_to_fs_dir = self._get_absolute_path(link_to_fs_dir)
             enforce_path_exists(link_to_fs_dir)
-            if os.path.exists(os.path.join(link_to_fs_dir, subject)):
+            if op.exists(op.join(link_to_fs_dir, subject)):
                 raise RuntimeError(
                     'The directory {} already contains the subject-folder {}.'
                     '\nYou must manually (re)move it before proceeding.'
                     .format(link_to_fs_dir, subject))
             m2m_outputs = self._mri2mesh_outputs(subject, analysis_name)
-            link_name = os.path.join(link_to_fs_dir, m2m_outputs['subject'])
+            link_name = op.join(link_to_fs_dir, m2m_outputs['subject'])
             link_cmd = 'ln -s {} {}'.format(m2m_outputs['fs_dir'], link_name)
 
         if not isinstance(directives, (string_types, list)):
@@ -224,13 +225,12 @@ class SimNIBS(ClusterBatch):
             if mri is not None and '/' not in mri and '.nii' not in mri:
                 series = _get_unique_series(Query(self.proj_name), mri,
                                             subject, 'MR')
-                dcm = os.path.join(series[0]['path'], series[0]['files'][0])
-                nii_path = os.path.join(self.info['output_dir'], 'nifti',
-                                        subject)
+                dcm = op.join(series[0]['path'], series[0]['files'][0])
+                nii_path = op.join(self.info['output_dir'], 'nifti', subject)
                 mkdir_p(nii_path)
                 mri = series[0]['seriename']  # in case wildcards were used
-                mri = os.path.join(nii_path, mri + '.nii.gz')
-                if not os.path.isfile(mri):  # if exists, don't redo!
+                mri = op.join(nii_path, mri + '.nii.gz')
+                if not op.isfile(mri):  # if exists, don't redo!
                     self.logger.info('Converting DICOM to Nifti, this will '
                                      'take about 15 seconds...')
                     convert_dicom_to_nifti(dcm, mri)
@@ -331,44 +331,58 @@ class SimNIBS(ClusterBatch):
             raise RuntimeError(msg)
 
         meshfix_opts = ' -u 10 --vertices {:d} --fsmesh'.format(n_vertices)
-        bem_dir = os.path.join(m2m_outputs['fs_dir'], 'bem')
+        bem_dir = op.join(m2m_outputs['fs_dir'], 'bem')
         bem_surfaces = dict(inner_skull='csf.stl',
                             outer_skull='skull.stl',
                             outer_skin='skin.stl')
+
+        cmd = None
         for bem_layer, surf in bem_surfaces.items():
-            surf_fname = os.path.join(m2m_outputs['m2m_dir'], surf)
+            surf_fname = op.join(m2m_outputs['m2m_dir'], surf)
             if not check_source_readable(surf_fname):
                 raise RuntimeError(
                     'Could not find surface {surf:s}; mri2mesh may have exited'
                     ' with an error, please check.'.format(surf=surf))
-            bem_fname = os.path.join(bem_dir, bem_layer)
+            bem_fname = op.join(bem_dir, bem_layer)
 
-            cmds = ['meshfix {sfn:s} {mfo:s} -o {bfn:s}'
-                    .format(sfn=surf_fname, mfo=meshfix_opts, bfn=bem_fname)]
+            cmd = add_to_command(cmd, 'meshfix {sfn:s} {mfo:s} -o {bfn:s}',
+                                 sfn=surf_fname, mfo=meshfix_opts,
+                                 bfn=bem_fname)
 
-            xfm_volume = os.path.join(m2m_outputs['m2m_dir'], 'tmp',
-                                      'subcortical_FS.nii.gz')
-            xfm = os.path.join(m2m_outputs['m2m_dir'], 'tmp', 'unity.xfm')
+            xfm_volume = op.join(m2m_outputs['m2m_dir'], 'tmp',
+                                 'subcortical_FS.nii.gz')
+            xfm = op.join(m2m_outputs['m2m_dir'], 'tmp', 'unity.xfm')
 
             # NB This is needed! Otherwise the stl->fsmesh conversion output
             # lacks some transformation and is misaligned with the MR
-            cmds += ['mris_transform --dst {xv:s} --src {xv:s} '
-                     '{bfn:s}.fsmesh {xfm:s} {bfn:s}.surf'
-                     .format(xv=xfm_volume, bfn=bem_fname, xfm=xfm)]
-            cmds += ['rm {bfn:s}.fsmesh'.format(bfn=bem_fname)]
+            cmd = add_to_command(cmd,
+                                 ('mris_transform --dst {xv:s} --src {xv:s} '
+                                  '{bfn:s}.fsmesh {xfm:s} {bfn:s}.surf'),
+                                 xv=xfm_volume, bfn=bem_fname, xfm=xfm)
+            # remove the low-res, non-coregistered surface mesh
+            cmd = add_to_command(cmd, 'rm {bfn:s}.fsmesh', bfn=bem_fname)
 
         if make_coreg_head:
-            cmd = add_to_command(cmd, 'cd {} && mkheadsurf -subjid {}',
-                                 bem_dir, subject_dirname)
-            cmd = add_to_command(cmd, ('mne_surf2bem --surf ../surf/lh.seghead '
-                                 '--id 4 --check --fif {}-head-dense.fif'),
-                                 subject_dirname)
-            cmd = add_to_command(cmd, ('rm -f {sub:s}-head.fif && '
-                                 'ln -s {sub:s}-head-dense.fif {sub:s}-head.fif'),
-                                 sub=subject_dirname)
+            head_fname = op.join(bem_dir,
+                                 m2m_outputs['subject'] + '-head')
+            # get the highres skin-surface and transform it
+            cmd = add_to_command(cmd,
+                                 ('mris_transform --dst {xv:s} --src {xv:s} '
+                                  '{sfn:s} {xfm:s} {head_surf:s}'),
+                                 xv=xfm_volume, sfn=surf_fname, xfm=xfm,
+                                 head_surf=head_fname + '-dense.surf')
+            cmd = add_to_command(cmd,
+                                 ('mne_surf2bem --surf {head_surf:s} '
+                                  '--id 4 --check --fif {head_fif:s}'),
+                                 head_surf=head_fname + '-dense.surf',
+                                 head_fif=head_fname + '-dense.fif')
+            cmd = add_to_command(cmd, ('rm -f {head_fname:s}.fif && '
+                                       'ln -s {head_fname:s}-dense.fif '
+                                       '{head_fname:s}-head.fif'),
+                                 head_fname=head_fname)
 
         # One job per subject, since these are "cheap" operations
-        self.add_job(cmds, job_name='meshfix',
+        self.add_job(cmd, job_name='meshfix',
                      working_dir=self.info['output_dir'],
                      **job_options)
 
@@ -378,10 +392,10 @@ class SimNIBS(ClusterBatch):
         else:
             suffix = ''
 
-        fs_dir = os.path.join(self.info['output_dir'],
-                              'fs_' + subject + suffix)
-        m2m_dir = os.path.join(self.info['output_dir'],
-                               'm2m_' + subject + suffix)
+        fs_dir = op.join(self.info['output_dir'],
+                         'fs_' + subject + suffix)
+        m2m_dir = op.join(self.info['output_dir'],
+                          'm2m_' + subject + suffix)
         m2m_subject = subject + suffix
 
         return dict(subject=m2m_subject, fs_dir=fs_dir, m2m_dir=m2m_dir)
@@ -389,6 +403,6 @@ class SimNIBS(ClusterBatch):
     def _get_absolute_path(self, output_dir):
         if not output_dir.startswith('/'):
             # the path can be _relative_ to the project dir
-            output_dir = os.path.join('/projects', self.proj_name,
-                                      output_dir)
+            output_dir = op.join('/projects', self.proj_name,
+                                 output_dir)
         return output_dir
