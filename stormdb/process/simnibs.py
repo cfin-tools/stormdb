@@ -373,15 +373,13 @@ class SimNIBS(ClusterBatch):
                                  mne_surf=mne_surf, fsmesh=bem_fname)
 
             if make_coreg_head and bem_layer == 'outer_skin':
-                skin_fname = op.join(m2m_outputs['m2m_dir'], 'tmp',
-                                     'skin.off')  # this is about 60k vertices
                 head_fname = op.join(bem_dir,
                                      m2m_outputs['subject'] + '-head')
                 # get the highres skin-surface and transform it
                 cmd = add_to_command(cmd,
                                      ('mris_transform --dst {xv:s} --src '
                                       '{xv:s} {sfn:s} {xfm:s} {head_surf:s}'),
-                                     xv=xfm_volume, sfn=skin_fname, xfm=xfm,
+                                     xv=xfm_volume, sfn=surf_fname, xfm=xfm,
                                      head_surf=head_fname + '-dense.surf')
                 cmd = add_to_command(cmd,
                                      ('mne_surf2bem --surf {skin_surf:s} '
