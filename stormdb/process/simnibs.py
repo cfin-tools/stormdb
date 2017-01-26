@@ -368,15 +368,16 @@ class SimNIBS(ClusterBatch):
 
             mne_surf = op.join(bem_dir, bem_layer + '.surf')
             cmd = add_to_command(cmd, ('rm -f {mne_surf:s} && '
-                                       'ln -s {fsmesh:s} {mne_surf:s}'),
+                                       'ln -s {fsmesh:s}.surf {mne_surf:s}'),
                                  mne_surf=mne_surf, fsmesh=bem_fname)
 
             if make_coreg_head and bem_layer == 'outer_skin':
                 COREG_VERTICES = 30000
                 coreg_opts = ('-u 10 --vertices {:d} --fsmesh'
                               .format(COREG_VERTICES))
-                head_fname = op.join(bem_dir,
-                                     m2m_outputs['subject'] + '-head-dense')
+                head_fname = op.join(simnibs_bem_dir, 'head-dense')
+                coreg_fname = op.join(bem_dir, m2m_outputs['subject'] +
+                                      '-head.fif')
                 # get the highres skin-surface and transform it
                 cmd = add_to_command(cmd,
                                      'meshfix {sfn:s} {cro:s} -o {hfn:s}',
@@ -393,9 +394,10 @@ class SimNIBS(ClusterBatch):
                                       '--id 4 --check --fif {head_fif:s}'),
                                      skin_surf=head_fname + '.surf',
                                      head_fif=head_fname + '.fif')
-                cmd = add_to_command(cmd, ('rm -f {head_fname:s}.fif && '
-                                           'ln -s {head_fname:s}-dense.fif '
-                                           '{head_fname:s}-head.fif'),
+                cmd = add_to_command(cmd, ('rm -f {coreg_fname:s} && '
+                                           'ln -s {head_fname:s}.fif '
+                                           '{coreg_fname:s}'),
+                                     coreg_fname=coreg_fname,
                                      head_fname=head_fname)
 
         # One job per subject, since these are "cheap" operations
