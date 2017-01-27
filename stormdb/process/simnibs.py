@@ -13,7 +13,7 @@ import os
 import os.path as op
 from six import string_types
 from warnings import warn
-from .utils import convert_dicom_to_nifti
+from .utils import convert_dicom_to_nifti, _get_absolute_proj_path
 from ..base import (enforce_path_exists, check_source_readable,
                     _get_unique_series, mkdir_p, add_to_command)
 from ..access import Query
@@ -84,7 +84,7 @@ class SimNIBS(ClusterBatch):
                     'SN_SUBJECT_DIR environment variable. The directory must '
                     'exist.')
         else:
-            output_dir = self._get_absolute_path(output_dir)
+            output_dir = _get_absolute_proj_path(output_dir)
 
         enforce_path_exists(output_dir)
 
@@ -189,7 +189,7 @@ class SimNIBS(ClusterBatch):
                 'Subject {0} not found in database!'.format(subject))
 
         if isinstance(link_to_fs_dir, string_types):
-            link_to_fs_dir = self._get_absolute_path(link_to_fs_dir)
+            link_to_fs_dir = _get_absolute_proj_path(link_to_fs_dir)
             enforce_path_exists(link_to_fs_dir)
             if op.exists(op.join(link_to_fs_dir, subject)):
                 raise RuntimeError(

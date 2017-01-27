@@ -77,7 +77,11 @@ if options.subject is None:
     parser.print_help()
     raise RuntimeError('The subject argument must be set')
 
-flash_dir = op.join(os.getcwd(), 'flash05')
+flash_dir = op.join(os.getcwd(), 'flash05/')  # NB final slash is important!
+if not op.isdir(flash_dir):
+    raise RuntimeError('No sorted flash-folders found in {}'
+                       .format(flash_dir))
+
 n_echos = len([name for name in os.listdir(flash_dir) if
               op.isdir(op.join(flash_dir, name))])
 

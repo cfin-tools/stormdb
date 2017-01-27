@@ -16,7 +16,8 @@ import glob
 from six import string_types
 from warnings import warn
 
-from .utils import first_file_in_dir, make_copy_of_dicom_dir
+from .utils import (first_file_in_dir, make_copy_of_dicom_dir,
+                    _get_absolute_proj_path)
 from ..base import (enforce_path_exists, check_source_readable,
                     _get_unique_series, add_to_command)
 from ..access import Query
@@ -73,10 +74,8 @@ class Freesurfer(ClusterBatch):
                                  'or by setting the SUBJECT_DIR environment '
                                  'variable. The directory must exist.')
         else:
-            if not subjects_dir.startswith('/'):
-                # the path can be _relative_ to the project dir
-                subjects_dir = os.path.join('/projects', self.proj_name,
-                                            subjects_dir)
+            subjects_dir = _get_absolute_proj_path(subjects_dir)
+            os.environ['SUBJECTS_DIR'] = subjects_dir
 
         enforce_path_exists(subjects_dir)
 
@@ -345,7 +344,10 @@ class Freesurfer(ClusterBatch):
             cmd = add_to_command(cmd, 'cp {}/* {}',
                                  series[0]['path'], flash_dcm)
 
-        cmd = add_to_command(cmd, 'cd {} && mne_organize_dicom {}',
+        # NB using modified version of mne_organize_dicom!
+        # Changes: 1) strip unicode from series name,
+        #          2) fix if-clause bug for checking relative pathness
+        cmd = add_to_command(cmd, 'cd {} && cfin_organize_dicom {}',
                              flash_dir, flash_dcm)
 
         cmd = add_to_command(cmd, 'rm -f flash05 && ln -s {} flash05',

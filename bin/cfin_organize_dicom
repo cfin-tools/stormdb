@@ -1,0 +1,88 @@
+#!/bin/bash
+#
+#
+#   Organize the MRI data
+#
+#   Create a directory structure according to the series and subseries (different echos for flashes)
+#
+#   Copyright 2006
+#
+#   Matti Hamalainen
+#   Athinoula A. Martinos Center for Biomedical Imaging
+#   Massachusetts General Hospital
+#   Charlestown, MA, USA
+#
+#   $Id: mne_organize_dicom 3400 2013-04-16 21:21:39Z msh $
+#
+#   Revision 1.1  2006/05/16 02:29:49  msh
+#   Added mne_flash_bem and mne_organize_dicom
+#
+#   Revision 1.2  2012/03/06 16:22     dwakeman
+#   Enabled full path and added warnings about not providing the full path
+#
+function cleanup()
+{
+    rm -f $$.dir
+    rm -f $$.one
+    rm -f $$.unicode
+    rm -f $$.script
+    exit 0
+}
+#
+trap cleanup 1 2
+#
+if [ $# -eq 0 ]
+then
+    echo "Usage : $0 <Slice directory>"
+    exit 1
+fi
+dicom_dir=$1
+if [ ! -d $dicom_dir ]
+then
+    echo "$1 is not a directory"
+    exit 1
+fi
+echo $dicom_dir | grep '^/' >/dev/null
+if [ $? -eq 0 ]
+then
+    echo "Thank you for using a full path name."
+    full_path=1
+else
+    echo "You did not provide a full path (recommended). Assuming relative paths"
+    full_path=0
+fi
+
+find $1 -follow -type f > $$.dir
+echo -n "Figuring it all out. Please wait.."
+#
+# Read the filenames and proceed accordingly
+#
+tot=$(wc -l $$.dir | awk '{ print $1 }')
+i=0
+while read filename
+do
+  echo -n "$filename " >$$.one
+  mne_dicom_essentials  --in $filename >$$.unicode
+  # CFIN MOD: strip all unicode from name, as StormDB does!
+  iconv -c -f utf-8 -t ascii $$.unicode >>$$.one
+  #########################################################
+  if [ $full_path == '1' ]
+  then
+   awk 'BEGIN { printf "#!/bin/sh\n#\n" }; { printf "mkdir -p %03d_%s/%03d\ncd %03d_%s/%03d\nln -s %s .\ncd - >/dev/null\n", $3,$11,$15+1,$3,$11,$15+1,$1} ' < $$.one > $$.script
+  else
+  awk 'BEGIN { printf "#!/bin/sh\n#\n" }; { printf "mkdir -p %03d_%s/%03d\ncd %03d_%s/%03d\nln -s ../../%s .\ncd - >/dev/null\n", $3,$11,$15+1,$3,$11,$15+1,$1} ' < $$.one > $$.script
+  fi
+  chmod +x $$.script
+  ./$$.script
+  let i=$i+1
+  let a=$i%50
+  if [ $a -eq 0 ]
+  then
+      echo -n "$i/$tot.."
+  fi
+done < $$.dir
+echo "$i/$tot...[done]"
+cleanup
+exit 0
+
+

@@ -57,3 +57,11 @@ def convert_dicom_to_nifti(dicom, output_fname,
                            '{:s}'.format(cpe.returncode, cpe.output))
     finally:
         shutil.rmtree(tmpdir)
+
+
+def _get_absolute_proj_path(output_dir):
+    if not output_dir.startswith('/'):
+        # the path can be _relative_ to the project dir
+        output_dir = op.join('/projects', self.proj_name,
+                             output_dir)
+    return output_dir
