@@ -220,7 +220,11 @@ class Freesurfer(ClusterBatch):
                             flash5=None, flash30=None, make_coreg_head=True,
                             job_options=dict(queue='short.q', n_threads=1),
                             **kwargs):
-        """Convert mri2mesh output to Freesurfer meshes suitable for BEMs.
+        """Create BEM surfaces with or without multi-echo FLASH images.
+
+        If a flash5-image is not specified, the watershed-algorithm in
+        Freesurfer will be used to create the inner skull surface only,
+        though results vary.
 
         Parameters
         ----------
@@ -232,9 +236,7 @@ class Freesurfer(ClusterBatch):
         flash5 : str | None (optional)
             The name of the multi-echo FLASH series with 5 degree flip angle
             that will be used to create the 3 main compartments of the head:
-            inner skull, outer skull and outer skin. If None (default), the
-            watershed-algorithm in Freesurfer will be used to create the inner
-            skull surface only, though results vary.
+            inner skull, outer skull and outer skin. Default: None.
         flash30 : str | None (optional)
             The name of the multi-echo FLASH series with 30 degree flip angle.
             If None (default), only the 5 degree FLASH will be used. The
