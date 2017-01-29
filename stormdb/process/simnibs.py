@@ -62,6 +62,9 @@ class SimNIBS(ClusterBatch):
         `recon-all` output goes into output_dir/fs_* (* refers to a subject).
         If None, we'll try to read the environment variable SN_SUBJECTS_DIR
         from the shell (default).
+    log_dir : str
+        The directory into which job logfiles are written. Defaults to
+        'scratch/qsub_logs' in the project folder.
     verbose : bool
         If True, print out extra information as we go (default: False).
 
@@ -71,7 +74,8 @@ class SimNIBS(ClusterBatch):
         'valid_subjects': list of subjects with MR-modality
         'output_dir': SimNIBS output directory
     """
-    def __init__(self, proj_name=None, output_dir=None, verbose=False):
+    def __init__(self, proj_name=None, output_dir=None,
+                 log_dir='scratch/qsub_logs', verbose=False):
         super(SimNIBS, self).__init__(proj_name, verbose=verbose)
 
         if output_dir is None:
@@ -88,13 +92,16 @@ class SimNIBS(ClusterBatch):
 
         enforce_path_exists(output_dir)
 
+        log_dir = _get_absolute_proj_path(log_dir)
+        mkdir_p(log_dir)
+
         valid_subjects = Query(proj_name).get_subjects(has_modality='MR')
         if len(valid_subjects) == 0:
             raise RuntimeError(
                 'No subjects with MR-modality found in {}!'
                 .format(self.proj_name))
         self.info = dict(valid_subjects=valid_subjects,
-                         output_dir=output_dir)
+                         output_dir=output_dir, log_dir=log_dir)
         self.verbose = verbose
 
     def mri2mesh(self, subject, t1_fs='*t1*', t2_hb='*t2*',
@@ -161,6 +168,11 @@ class SimNIBS(ClusterBatch):
                 subjects = self.info['valid_subjects']
             else:
                 subjects = [subject]
+
+        # HACK change the default job_option for working_dir to log_dir
+        if 'working_dir' not in job_options.keys():
+            job_options['working_dir'] = self.info['log_dir']
+
         for sub in subjects:
             self.logger.info(sub)
             try:
@@ -295,6 +307,11 @@ class SimNIBS(ClusterBatch):
                 subjects = self.info['valid_subjects']
             else:
                 subjects = [subject]
+
+        # HACK change the default job_option for working_dir to log_dir
+        if 'working_dir' not in job_options.keys():
+            job_options['working_dir'] = self.info['log_dir']
+
         for sub in subjects:
             self.logger.info(sub)
             try:
@@ -418,10 +435,3 @@ class SimNIBS(ClusterBatch):
         m2m_subject = subject + suffix
 
         return dict(subject=m2m_subject, fs_dir=fs_dir, m2m_dir=m2m_dir)
-
-    def _get_absolute_path(self, output_dir):
-        if not output_dir.startswith('/'):
-            # the path can be _relative_ to the project dir
-            output_dir = op.join('/projects', self.proj_name,
-                                 output_dir)
-        return output_dir
