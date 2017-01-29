@@ -19,7 +19,7 @@ from warnings import warn
 from .utils import (first_file_in_dir, make_copy_of_dicom_dir,
                     _get_absolute_proj_path)
 from ..base import (enforce_path_exists, check_source_readable,
-                    _get_unique_series, add_to_command)
+                    _get_unique_series, add_to_command, mkdir_p)
 from ..access import Query
 from ..cluster import ClusterBatch
 
@@ -52,6 +52,9 @@ class Freesurfer(ClusterBatch):
         The name of the T1-weighted MR series to use for cortex extraction.
         This parameter is optional, it only has an effect when running
         recon-all for the first time (mri_convert from DICOM to mgz).
+    log_dir : str
+        The directory into which job logfiles are written. Defaults to
+        'scratch/qsub_logs' in the project folder.
     verbose : bool
         If True, print out extra information as we go (default: False).
 
@@ -62,7 +65,7 @@ class Freesurfer(ClusterBatch):
     """
 
     def __init__(self, proj_name=None, subjects_dir=None, t1_series=None,
-                 verbose=False):
+                 log_dir='scratch/qsub_logs', verbose=False):
         super(Freesurfer, self).__init__(proj_name, verbose=verbose)
 
         if subjects_dir is None:
@@ -79,6 +82,9 @@ class Freesurfer(ClusterBatch):
 
         enforce_path_exists(subjects_dir)
 
+        log_dir = _get_absolute_proj_path(log_dir)
+        mkdir_p(log_dir)
+
         valid_subjects = Query(proj_name).get_subjects(has_modality='MR')
         if len(valid_subjects) == 0:
             raise RuntimeError(
@@ -86,7 +92,7 @@ class Freesurfer(ClusterBatch):
                 .format(self.proj_name))
 
         self.info = dict(valid_subjects=valid_subjects,
-                         subjects_dir=subjects_dir)
+                         subjects_dir=subjects_dir, log_dir=log_dir)
 
         if t1_series is not None:
             self.info.update(t1_series=t1_series)
@@ -148,6 +154,10 @@ class Freesurfer(ClusterBatch):
         # This has the dual effect of: i) making a list out of a string, and
         # ii) COPYING the directives-list to another one
         recon_all_flags = list(directives)
+
+        # HACK change the default job_option for working_dir to log_dir
+        if 'working_dir' not in job_options.keys():
+            job_options['working_dir'] = self.info['log_dir']
 
         for sub in subjects:
             self.logger.info(sub)
@@ -277,6 +287,10 @@ class Freesurfer(ClusterBatch):
                 raise ValueError('flash30 must be a series name (str)')
             do_flash = True
 
+        # HACK change the default job_option for working_dir to log_dir
+        if 'working_dir' not in job_options.keys():
+            job_options['working_dir'] = self.info['log_dir']
+
         for sub in subjects:
             self.logger.info(sub)
             if subject not in self.info['valid_subjects']:
@@ -378,6 +392,7 @@ class Freesurfer(ClusterBatch):
                                  f5reg=flash5_reg)
         if make_coreg_head:
             cmd = make_coreg_head_commands(bem_dir, subject_dirname, cmd=cmd)
+            job_options['mem_free'] = '4G'  # mkheadsurf can be as much as 2GB
 
         self.add_job(cmd, job_name='cfin_flash_bem', **job_options)
 
@@ -423,6 +438,7 @@ class Freesurfer(ClusterBatch):
 
         if make_coreg_head:
             cmd = make_coreg_head_commands(bem_dir, subject_dirname, cmd=cmd)
+            job_options['mem_free'] = '4G'  # mkheadsurf can be as much as 2GB
 
         self.add_job(cmd, job_name='watershed_bem', **job_options)
 
