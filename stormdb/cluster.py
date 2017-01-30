@@ -31,6 +31,7 @@ QSUB_SCHEMA = """
 #$ -q {queue:s}
 {opt_threaded_flag:s}
 {opt_h_vmem_flag:s}
+{opt_mem_free_flag:s}
 
 # Make sure process uses max requested number of threads!
 export OMP_NUM_THREADS=$NSLOTS
@@ -151,7 +152,8 @@ class ClusterJob(object):
         be modified once defined).
     """
     def __init__(self, cmd=None, proj_name=None, queue='short.q', h_vmem=None,
-                 n_threads=1, working_dir='cwd', job_name=None, cleanup=True):
+                 mem_free=None, n_threads=1, working_dir='cwd', job_name=None,
+                 cleanup=True):
         self.cluster = Cluster()
 
         if not cmd:
@@ -171,6 +173,7 @@ class ClusterJob(object):
         self.queue = queue
         self.n_threads = n_threads
         self.h_vmem = h_vmem
+        self.mem_free = mem_free
 
         self._qsub_schema = QSUB_SCHEMA
         self._qsub_script = None
@@ -192,6 +195,9 @@ class ClusterJob(object):
         if self.h_vmem is not None:
             # XXX would be nice with some sanity checking here...
             opt_h_vmem_flag = "#$ -l h_vmem={:s}".format(self.h_vmem)
+        if self.mem_free is not None:
+            # XXX would be nice with some sanity checking here...
+            opt_mem_free_flag = "#$ -l mem_free={:s}".format(self.mem_free)
         if job_name is None:
             job_name = 'py-wrapper'
         if working_dir is not None and isinstance(working_dir, string_types):
@@ -202,7 +208,8 @@ class ClusterJob(object):
                 cwd_flag = '#$ -wd {:s}'.format(working_dir)
 
         self._create_qsub_script(job_name, cwd_flag,
-                                 opt_threaded_flag, opt_h_vmem_flag)
+                                 opt_threaded_flag, opt_h_vmem_flag,
+                                 opt_mem_free_flag)
 
     @property
     def cmd(self):
@@ -225,7 +232,7 @@ class ClusterJob(object):
             self._cmd = value
 
     def _create_qsub_script(self, job_name, cwd_flag, opt_threaded_flag,
-                            opt_h_vmem_flag):
+                            opt_h_vmem_flag, opt_mem_free_flag):
         """All variables should be defined"""
         if (self.cmd is None or self.queue is None or job_name is None or
                 cwd_flag is None or opt_threaded_flag is None or
@@ -235,6 +242,7 @@ class ClusterJob(object):
         self._qsub_script =\
             self._qsub_schema.format(opt_threaded_flag=opt_threaded_flag,
                                      opt_h_vmem_flag=opt_h_vmem_flag,
+                                     opt_mem_free_flag=opt_mem_free_flag,
                                      cwd_flag=cwd_flag, queue=self.queue,
                                      exec_cmd=self.cmd, job_name=job_name)
 
