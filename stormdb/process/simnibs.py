@@ -88,11 +88,11 @@ class SimNIBS(ClusterBatch):
                     'SN_SUBJECT_DIR environment variable. The directory must '
                     'exist.')
         else:
-            output_dir = _get_absolute_proj_path(output_dir)
+            output_dir = _get_absolute_proj_path(output_dir, self.proj_name)
 
         enforce_path_exists(output_dir)
 
-        log_dir = _get_absolute_proj_path(log_dir)
+        log_dir = _get_absolute_proj_path(log_dir, self.proj_name)
         mkdir_p(log_dir)
 
         valid_subjects = Query(proj_name).get_subjects(has_modality='MR')
@@ -201,7 +201,8 @@ class SimNIBS(ClusterBatch):
                 'Subject {0} not found in database!'.format(subject))
 
         if isinstance(link_to_fs_dir, string_types):
-            link_to_fs_dir = _get_absolute_proj_path(link_to_fs_dir)
+            link_to_fs_dir = _get_absolute_proj_path(link_to_fs_dir,
+                                                     self.proj_name)
             enforce_path_exists(link_to_fs_dir)
             if op.exists(op.join(link_to_fs_dir, subject)):
                 raise RuntimeError(

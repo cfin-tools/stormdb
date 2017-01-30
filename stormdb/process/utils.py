@@ -9,6 +9,7 @@ Utility function for process-modules
 # License: BSD (3-clause)
 import subprocess as subp
 import os
+import os.path as op
 import shutil
 import tempfile
 from glob import glob
@@ -59,9 +60,9 @@ def convert_dicom_to_nifti(dicom, output_fname,
         shutil.rmtree(tmpdir)
 
 
-def _get_absolute_proj_path(output_dir):
+def _get_absolute_proj_path(output_dir, proj_name):
     if not output_dir.startswith('/'):
         # the path can be _relative_ to the project dir
-        output_dir = op.join('/projects', self.proj_name,
+        output_dir = op.join('/projects', proj_name,
                              output_dir)
     return output_dir
