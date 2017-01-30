@@ -188,6 +188,7 @@ class ClusterJob(object):
 
         opt_threaded_flag = ""
         opt_h_vmem_flag = ""
+        opt_mem_free_flag = ""
         cwd_flag = ''
         if self.n_threads > 1:
             self.cluster._check_parallel_env(self.queue, 'threaded')
