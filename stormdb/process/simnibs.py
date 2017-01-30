@@ -386,7 +386,8 @@ class SimNIBS(ClusterBatch):
 
             mne_surf = op.join(bem_dir, bem_layer + '.surf')
             cmd = add_to_command(cmd, ('rm -f {mne_surf:s} && '
-                                       'ln -s {fsmesh:s}.surf {mne_surf:s}'),
+                                       'ln -s {fsmesh:s}.surf {mne_surf:s} && '
+                                       'touch {mne_surf:s}'),
                                  mne_surf=mne_surf, fsmesh=bem_fname)
 
             if make_coreg_head and bem_layer == 'outer_skin':

@@ -386,11 +386,15 @@ class Freesurfer(ClusterBatch):
         for sn in surf_names:
             tri_fname = op.join(bem_dir, 'flash', sn + '.tri')
             surf_fname = op.join(bem_dir, 'flash', sn + '.surf')
+            link_fname = op.join(bem_dir, sn + '.surf')
             cmd = add_to_command(cmd,
                                  ('mne_convert_surface --tri {tri:s} '
                                   ' --surfout {surf:s} --swap --mghmri '
                                   '{f5reg:s}'), tri=tri_fname, surf=surf_fname,
                                  f5reg=flash5_reg)
+            cmd = add_to_command(cmd, ('rm -f {link:s} && ln -s {surf:s} '
+                                       '{link:s} && touch {link:s}'),
+                                 link=link_fname, surf=surf_fname)
             if sn == 'outer_skin' and not make_coreg_head:
                 cmd = make_sparse_head_commands(bem_dir, subject_dirname,
                                                 cmd=cmd)
@@ -433,10 +437,11 @@ class Freesurfer(ClusterBatch):
         bem_dir = op.join(self.info['subjects_dir'], subject_dirname, 'bem')
         surf_names = ('brain', 'inner_skull', 'outer_skull', 'outer_skin')
         for sn in surf_names:
-            surf_fname = op.join(bem_dir, sn + '.surf')
-            cmd = add_to_command(cmd, 'rm -f {}', surf_fname)
-            cmd = add_to_command(cmd, ('ln -s watershed/{}_{}_surface {}'),
-                                 subject_dirname, sn, surf_fname)
+            link_fname = op.join(bem_dir, sn + '.surf')
+            cmd = add_to_command(cmd, ('rm -f {link:s} && ln -s '
+                                       'watershed/{sub:s}_{sn:s}_surface '
+                                       '{link:s} && touch {link:s}'),
+                                 sub=subject_dirname, sn=sn, link=link_fname)
 
             if sn == 'outer_skin' and not make_coreg_head:
                 cmd = make_sparse_head_commands(bem_dir, subject_dirname,
