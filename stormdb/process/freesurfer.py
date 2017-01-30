@@ -77,12 +77,13 @@ class Freesurfer(ClusterBatch):
                                  'or by setting the SUBJECT_DIR environment '
                                  'variable. The directory must exist.')
         else:
-            subjects_dir = _get_absolute_proj_path(subjects_dir)
+            subjects_dir = _get_absolute_proj_path(subjects_dir,
+                                                   self.proj_name)
             os.environ['SUBJECTS_DIR'] = subjects_dir
 
         enforce_path_exists(subjects_dir)
 
-        log_dir = _get_absolute_proj_path(log_dir)
+        log_dir = _get_absolute_proj_path(log_dir, self.proj_name)
         mkdir_p(log_dir)
 
         valid_subjects = Query(proj_name).get_subjects(has_modality='MR')
