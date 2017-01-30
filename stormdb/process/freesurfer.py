@@ -390,6 +390,9 @@ class Freesurfer(ClusterBatch):
                                   ' --surfout {surf:s} --swap --mghmri '
                                   '{f5reg:s}'), tri=tri_fname, surf=surf_fname,
                                  f5reg=flash5_reg)
+            if sn == 'outer_skin' and not make_coreg_head:
+                cmd = make_sparse_head_commands(bem_dir, subject_dirname,
+                                                cmd=cmd)
         if make_coreg_head:
             cmd = make_coreg_head_commands(bem_dir, subject_dirname, cmd=cmd)
             job_options['mem_free'] = '4G'  # mkheadsurf can be as much as 2GB
@@ -419,22 +422,23 @@ class Freesurfer(ClusterBatch):
         # self.logger.info('Running mne_watershed_bem...')
         cmd = None
 
-        # Just in case: commands below are dependent on it set in environ
-        # cmd = add_to_command(cmd, 'export SUBJECTS_DIR={}',
-        #                     self.info['subjects_dir'])
-
         # NB Using local version of mne_watershed_bem
+        # NB creates the SUBJECT-head.fif file from outer_skin
         cmd = add_to_command(cmd, ('cfin_watershed_bem --sd {sd:s} '
                                    '--subject {sub:s} {atl:s} --overwrite'),
                              sd=self.info['subjects_dir'],
                              sub=subject_dirname, atl=atlas_str)
 
         bem_dir = op.join(self.info['subjects_dir'], subject_dirname, 'bem')
-        surf_names = ('inner_skull',)
+        surf_names = ('brain', 'inner_skull', 'outer_skull', 'outer_skin')
         for sn in surf_names:
             surf_fname = op.join(bem_dir, sn + '.surf')
             cmd = add_to_command(cmd, ('ln -s watershed/{}_{}_surface {}'),
                                  subject_dirname, sn, surf_fname)
+
+            if sn == 'outer_skin' and not make_coreg_head:
+                cmd = make_sparse_head_commands(bem_dir, subject_dirname,
+                                                cmd=cmd)
 
         if make_coreg_head:
             cmd = make_coreg_head_commands(bem_dir, subject_dirname, cmd=cmd)
@@ -585,6 +589,16 @@ def make_coreg_head_commands(bem_dir, subject_dirname, cmd=None):
                          'ln -s {sub:s}-head-dense.fif {sub:s}-head.fif'),
                          sub=subject_dirname)
     return cmd
+
+
+def make_sparse_head_commands(bem_dir, subject_dirname, cmd=None):
+
+    cmd = add_to_command(cmd, ('cd {} && mne_surf2bem --surf outer_skin.surf'
+                               '--check --fif {}-head-sparse.fif'),
+                         bem_dir, subject_dirname)
+    cmd = add_to_command(cmd, ('rm -f {sub:s}-head.fif && '
+                               'ln -s {sub:s}-head-sparse.fif '
+                               '{sub:s}-head.fif'), sub=subject_dirname)
 
 
 def _prepare_env(subject, subjects_dir, requires_freesurfer, requires_mne):
