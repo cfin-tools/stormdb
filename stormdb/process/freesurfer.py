@@ -600,6 +600,7 @@ def make_sparse_head_commands(bem_dir, subject_dirname, cmd=None):
     cmd = add_to_command(cmd, ('rm -f {sub:s}-head.fif && '
                                'ln -s {sub:s}-head-sparse.fif '
                                '{sub:s}-head.fif'), sub=subject_dirname)
+    return cmd
 
 
 def _prepare_env(subject, subjects_dir, requires_freesurfer, requires_mne):
