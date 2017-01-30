@@ -77,6 +77,7 @@ if options.subject is None:
     parser.print_help()
     raise RuntimeError('The subject argument must be set')
 
+# NB assumes this is run in the flash-dir (like mne_flash_bem)
 flash_dir = op.join(os.getcwd(), 'flash05/')  # NB final slash is important!
 if not op.isdir(flash_dir):
     raise RuntimeError('No sorted flash-folders found in {}'

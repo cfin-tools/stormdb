@@ -25,7 +25,7 @@ cleanup()
 usage()
 {
 	echo "usage: $0 [options]"
-	echo 
+	echo
 	echo "     --overwrite             (to write over existing files)"
 	echo "     --subject subject       (defaults to SUBJECT environment variable)"
 	echo "     --sd subjects_dir       (defaults to SUBJECTS_DIR environment variable)"
@@ -38,10 +38,10 @@ usage()
 	echo
 	echo "$0                      (SUBJECT environment variable set)"
 	echo "$0 --subject subject    (define subject on the command line)"
-	echo 
+	echo
 }
 #
-if [ ! "$FREESURFER_HOME" ] ; then 
+if [ ! "$FREESURFER_HOME" ] ; then
     echo "The FreeSurfer environment needs to be set up for this script"
     exit 1
 fi
@@ -60,8 +60,8 @@ volume=T1
 #
 while [ $# -gt 0 ]
 do
-	case "$1" in  
-	--subject) 
+	case "$1" in
+	--subject)
 		shift
 		if [ $# -eq 0 ]
 		then
@@ -71,7 +71,7 @@ do
 			export SUBJECT=$1
 		fi
 		;;
-	--sd) 
+	--sd)
 		shift
 		if [ $# -eq 0 ]
 		then
@@ -81,7 +81,7 @@ do
             export SUBJECTS_DIR=$1
 		fi
 		;;
-	--volume) 
+	--volume)
 		shift
 		if [ $# -eq 0 ]
 		then
@@ -150,12 +150,12 @@ then
 fi
 #
 if [ ! -d $subject_dir ]
-then 
+then
 	echo "Could not find the MRI data directory $subject_dir"
 	exit 1
 fi
 if [ ! -d $bem_dir ]
-then 
+then
     mkdir -p $bem_dir
     if [ $? -ne 0 ]
     then
@@ -164,7 +164,7 @@ then
     fi
 fi
 if [ ! -d $T1_dir -a ! -f $T1_mgz ]
-then 
+then
     echo "Could not find the MRI data"
     exit 1
 fi
@@ -177,7 +177,7 @@ then
 	else
 		rm -rf $ws_dir
 		if [ $? -ne 0 ]
-		then 
+		then
 			echo "Could not remove $ws_dir"
 			exit 1
 		fi
@@ -186,7 +186,7 @@ fi
 #
 #	Report
 #
-echo 
+echo
 echo "Running mri_watershed for BEM segmentation with the following parameters"
 echo
 echo "SUBJECTS_DIR = $SUBJECTS_DIR"
@@ -195,7 +195,7 @@ echo "Result dir   = $ws_dir"
 echo
 mkdir -p $ws_dir/ws
 if [ $? -ne 0 ]
-then 
+then
     echo "Could not create the destination directories"
     exit 1
 fi
@@ -205,7 +205,7 @@ then
     mri_watershed $preflood $atlas -useSRAS -surf $ws_dir/$SUBJECT $T1_mgz $ws_dir/ws
 else
     mri_watershed $preflood $atlas -useSRAS -surf $ws_dir/$SUBJECT $T1_dir $ws_dir/ws
-fi    
+fi
 if [ $? -ne 0 ]
 then
     exit 1
@@ -218,12 +218,12 @@ if [ -f $T1_mgz ] ; then
 	mne_convert_surface --surf $s --mghmri $T1_mgz --surfout $s
     done
 fi
-cd $bem_dir
-rm -f $SUBJECT-head.fif
-mne_surf2bem --surf $ws_dir/"$SUBJECT"_outer_skin_surface --id 4 --fif $SUBJECT-head.fif
-echo "Created $bem_dir/$SUBJECT-head.fif"
+# NB take care of making this elsewhere, cleaner code that way
+# cd $bem_dir
+# rm -f $SUBJECT-head.fif
+# mne_surf2bem --surf "$SUBJECT"_outer_skin_surface --id 4 --fif $SUBJECT-head-sparse.fif
+# echo "Created $SUBJECT-head.fif"
 echo
 echo "Complete."
 echo
 exit 0
-
