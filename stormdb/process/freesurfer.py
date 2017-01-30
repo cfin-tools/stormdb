@@ -434,6 +434,7 @@ class Freesurfer(ClusterBatch):
         surf_names = ('brain', 'inner_skull', 'outer_skull', 'outer_skin')
         for sn in surf_names:
             surf_fname = op.join(bem_dir, sn + '.surf')
+            cmd = add_to_command(cmd, 'rm -f {}', surf_fname)
             cmd = add_to_command(cmd, ('ln -s watershed/{}_{}_surface {}'),
                                  subject_dirname, sn, surf_fname)
 
@@ -594,7 +595,7 @@ def make_coreg_head_commands(bem_dir, subject_dirname, cmd=None):
 
 def make_sparse_head_commands(bem_dir, subject_dirname, cmd=None):
 
-    cmd = add_to_command(cmd, ('cd {} && mne_surf2bem --surf outer_skin.surf'
+    cmd = add_to_command(cmd, ('cd {} && mne_surf2bem --surf outer_skin.surf '
                                '--check --fif {}-head-sparse.fif'),
                          bem_dir, subject_dirname)
     cmd = add_to_command(cmd, ('rm -f {sub:s}-head.fif && '
