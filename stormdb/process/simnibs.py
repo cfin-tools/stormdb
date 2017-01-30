@@ -390,6 +390,20 @@ class SimNIBS(ClusterBatch):
                                        'touch {mne_surf:s}'),
                                  mne_surf=mne_surf, fsmesh=bem_fname)
 
+            if not make_coreg_head and bem_layer == 'outer_skin':
+                head_fname = op.join(simnibs_bem_dir, 'head-sparse.fif')
+                link_fname = op.join(bem_dir, '{}-head.fif')
+                cmd = add_to_command(cmd,
+                                     ('mne_surf2bem --surf {skin_surf:s} '
+                                      '--id 4 --check --fif {head_fif:s}'),
+                                     skin_surf=mne_surf, head_fif=head_fname)
+                cmd = add_to_command(cmd, ('rm -f {link_fname:s} && '
+                                           'ln -s {head_fname:s} '
+                                           '{link_fname:s} && '
+                                           'touch {link_fname:s}'),
+                                     link_fname=link_fname,
+                                     head_fname=head_fname)
+            # A bit ugly sequence of if's, to avoid deeply nested code...
             if make_coreg_head and bem_layer == 'outer_skin':
                 COREG_VERTICES = 30000
                 coreg_opts = ('-u 10 --vertices {:d} --fsmesh'
@@ -415,7 +429,8 @@ class SimNIBS(ClusterBatch):
                                      head_fif=head_fname + '.fif')
                 cmd = add_to_command(cmd, ('rm -f {coreg_fname:s} && '
                                            'ln -s {head_fname:s}.fif '
-                                           '{coreg_fname:s}'),
+                                           '{coreg_fname:s} && '
+                                           'touch {coreg_fname:s}'),
                                      coreg_fname=coreg_fname,
                                      head_fname=head_fname)
 
