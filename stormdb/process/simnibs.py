@@ -108,7 +108,7 @@ class SimNIBS(ClusterBatch):
                  directives=['brain', 'subcort', 'head'],
                  analysis_name=None, t2mask=False, t2pial=False,
                  t1_hb=None, t2_fs=None, link_to_fs_dir=None,
-                 job_options=dict(queue='long.q', n_threads=1)):
+                 job_options=None):
         """Build a SimNIBS mri2mesh-command for later execution.
 
         Parameters
@@ -151,13 +151,11 @@ class SimNIBS(ClusterBatch):
             Optionally specify a path into which the Freesurfer-reconstructions
             will be linked to (default: None). This is recommended for MNE
             and mne-python users, as those tools assume this structure.
-        job_options : dict
-            Dictionary of optional arguments to pass to ClusterJob. The
-            default set of options is:
+        job_options : dict | None
+            Dictionary of optional arguments to pass to ClusterJob. If None,
+            the default job options will be used, which for mri2mesh are:
                 job_options=dict(queue='long.q', n_threads=1)
-            which sends the job to the cluster queue 'long.q', specifies that
-            a single CPU core should be used (not all queues support multi-
-            threading).
+            See stormdb.cluster.ClusterJob for more details.
         """
         if isinstance(subject, (list, tuple)):
             self.logger.info('Processing multiple subjects:')
@@ -169,9 +167,13 @@ class SimNIBS(ClusterBatch):
             else:
                 subjects = [subject]
 
-        # HACK change the default job_option for working_dir to log_dir
-        if 'working_dir' not in job_options.keys():
-            job_options['working_dir'] = self.info['log_dir']
+        # default values defined here
+        this_job_opts = dict(queue='long.q', n_threads=1,
+                             working_dir=self.info['log_dir'])
+        if job_options is not None:
+            if not isinstance(job_options, dict):
+                raise ValueError('Job options must be given as a dict')
+            this_job_opts.update(job_options)  # user-spec'd keys updated
 
         for sub in subjects:
             self.logger.info(sub)
@@ -181,7 +183,7 @@ class SimNIBS(ClusterBatch):
                                analysis_name=analysis_name,
                                t2mask=t2mask, t2pial=t2pial, t1_hb=t1_hb,
                                t2_fs=t2_fs, link_to_fs_dir=link_to_fs_dir,
-                               job_options=job_options)
+                               job_options=this_job_opts)
             except:
                 self._joblist = []  # evicerate on error
                 raise
@@ -193,7 +195,7 @@ class SimNIBS(ClusterBatch):
                   directives=['brain', 'subcort', 'head'],
                   analysis_name=None, t2mask=False, t2pial=False,
                   t1_hb=None, t2_fs=None, link_to_fs_dir=None,
-                  job_options=dict(queue='long.q', n_threads=1)):
+                  job_options=dict()):
         "Method for single subjects"
 
         if subject not in self.info['valid_subjects']:
@@ -271,12 +273,11 @@ class SimNIBS(ClusterBatch):
         if link_to_fs_dir is not None:
             cmd += [link_cmd]
 
-        self.add_job(cmd, working_dir=self.info['output_dir'],
-                     job_name='mri2mesh', **job_options)
+        self.add_job(cmd, job_name='mri2mesh', **job_options)
 
     def create_bem_surfaces(self, subject, n_vertices=5120,
                             analysis_name=None, make_coreg_head=True,
-                            job_options=dict(queue='short.q', n_threads=1)):
+                            job_options=None):
         """Convert mri2mesh output to Freesurfer meshes suitable for BEMs.
 
         Parameters
@@ -295,9 +296,11 @@ class SimNIBS(ClusterBatch):
             If True (default), make a high-resolution head (outer skin) surface
             for MEG/EEG coregistration purposes. NB: The number of vertices is
             currently fixed at 30,000. This could be made higher, if needed.
-        job_options : dict
-            Dictionary of optional arguments to pass to ClusterJob. The
-            default set here is: job_options=dict(queue='short.q', n_threads=1)
+        job_options : dict | None
+            Dictionary of optional arguments to pass to ClusterJob. If None,
+            the default job options will be used, which for create_bem are:
+                job_options=dict(queue='short.q', n_threads=1)
+            See stormdb.cluster.ClusterJob for more details.
         """
         if isinstance(subject, (list, tuple)):
             self.logger.info('Processing multiple subjects:')
@@ -309,9 +312,13 @@ class SimNIBS(ClusterBatch):
             else:
                 subjects = [subject]
 
-        # HACK change the default job_option for working_dir to log_dir
-        if 'working_dir' not in job_options.keys():
-            job_options['working_dir'] = self.info['log_dir']
+        # default values defined here
+        this_job_opts = dict(queue='short.q', n_threads=1,
+                             working_dir=self.info['log_dir'])
+        if job_options is not None:
+            if not isinstance(job_options, dict):
+                raise ValueError('Job options must be given as a dict')
+            this_job_opts.update(job_options)  # user-spec'd keys updated
 
         for sub in subjects:
             self.logger.info(sub)
@@ -319,7 +326,7 @@ class SimNIBS(ClusterBatch):
                 self._create_bem_surfaces(sub, n_vertices=n_vertices,
                                           analysis_name=analysis_name,
                                           make_coreg_head=True,
-                                          job_options=job_options)
+                                          job_options=this_job_opts)
             except:
                 self._joblist = []  # evicerate on error
                 raise
@@ -329,7 +336,7 @@ class SimNIBS(ClusterBatch):
 
     def _create_bem_surfaces(self, subject, n_vertices=5120,
                              analysis_name=None, make_coreg_head=True,
-                             job_options=dict(queue='short.q', n_threads=1)):
+                             job_options=dict()):
         "Create BEMs for single subject."
         if subject not in self.info['valid_subjects']:
             raise RuntimeError(
@@ -435,9 +442,7 @@ class SimNIBS(ClusterBatch):
                                      head_fname=head_fname)
 
         # One job per subject, since these are "cheap" operations
-        self.add_job(cmd, job_name='meshfix',
-                     working_dir=self.info['output_dir'],
-                     **job_options)
+        self.add_job(cmd, job_name='meshfix', **job_options)
 
     def _mri2mesh_outputs(self, subject, analysis_name):
         if analysis_name is not None:

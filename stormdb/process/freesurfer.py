@@ -156,9 +156,13 @@ class Freesurfer(ClusterBatch):
         # ii) COPYING the directives-list to another one
         recon_all_flags = list(directives)
 
-        # HACK change the default job_option for working_dir to log_dir
-        if 'working_dir' not in job_options.keys():
-            job_options['working_dir'] = self.info['log_dir']
+        # default values defined here
+        this_job_opts = dict(queue='long.q', n_threads=1,
+                             working_dir=self.info['log_dir'])
+        if job_options is not None:
+            if not isinstance(job_options, dict):
+                raise ValueError('Job options must be given as a dict')
+            this_job_opts.update(job_options)  # user-spec'd keys updated
 
         for sub in subjects:
             self.logger.info(sub)
@@ -166,7 +170,7 @@ class Freesurfer(ClusterBatch):
                 self._recon_all(sub, directives=recon_all_flags,
                                 hemi=hemi, t1_series=t1_series,
                                 analysis_name=analysis_name,
-                                job_options=job_options)
+                                job_options=this_job_opts)
             except:
                 self._joblist = []  # evicerate on error
                 raise
@@ -229,8 +233,7 @@ class Freesurfer(ClusterBatch):
 
     def create_bem_surfaces(self, subject, analysis_name=None,
                             flash5=None, flash30=None, make_coreg_head=True,
-                            job_options=dict(queue='short.q', n_threads=1),
-                            **kwargs):
+                            job_options=None, **kwargs):
         """Create BEM surfaces with or without multi-echo FLASH images.
 
         If a flash5-image is not specified, the watershed-algorithm in
@@ -259,9 +262,10 @@ class Freesurfer(ClusterBatch):
             GitHub if this is a problem.
         analysis_name : str | None
             Optional suffix to add to subject name (e.g. '_with_t2mask')
-        job_options : dict
-            Dictionary of optional arguments to pass to ClusterJob. The
-            default set here is: job_options=dict(queue='short.q', n_threads=1)
+        job_options : dict | None
+            Dictionary of optional arguments to pass to ClusterJob. If None,
+            the default set is: job_options=dict(queue='short.q', n_threads=1)
+            See stormdb.cluster.ClusterJob for more details.
         **kwargs : optional
             Optional keyword arguments, depending on whether FLASH-images or
             watershed-algorithm is used.
@@ -288,9 +292,13 @@ class Freesurfer(ClusterBatch):
                 raise ValueError('flash30 must be a series name (str)')
             do_flash = True
 
-        # HACK change the default job_option for working_dir to log_dir
-        if 'working_dir' not in job_options.keys():
-            job_options['working_dir'] = self.info['log_dir']
+        # default values defined here
+        this_job_opts = dict(queue='short.q', n_threads=1,
+                             working_dir=self.info['log_dir'])
+        if job_options is not None:
+            if not isinstance(job_options, dict):
+                raise ValueError('Job options must be given as a dict')
+            this_job_opts.update(job_options)  # user-spec'd keys updated
 
         for sub in subjects:
             self.logger.info(sub)
@@ -314,12 +322,12 @@ class Freesurfer(ClusterBatch):
                         sub, flash5, flash30=flash30,
                         make_coreg_head=make_coreg_head,
                         analysis_name=analysis_name,
-                        job_options=job_options, **kwargs)
+                        job_options=this_job_opts, **kwargs)
                 elif do_watershed:
                     self._create_bem_surfaces_watershed(
                         sub, make_coreg_head=make_coreg_head,
                         analysis_name=analysis_name,
-                        job_options=job_options, **kwargs)
+                        job_options=this_job_opts, **kwargs)
             except:
                 self._joblist = []  # evicerate on error
                 raise
@@ -329,8 +337,7 @@ class Freesurfer(ClusterBatch):
 
     def _create_bem_surfaces_flash(self, subject, flash5, make_coreg_head=True,
                                    analysis_name=None, flash30=None,
-                                   job_options=dict(queue='short.q',
-                                                    n_threads=1)):
+                                   job_options=dict()):
         """Create BEMs for single subject."""
         subject_dirname = subject
         if analysis_name is not None:
@@ -400,15 +407,15 @@ class Freesurfer(ClusterBatch):
                                                 cmd=cmd)
         if make_coreg_head:
             cmd = make_coreg_head_commands(bem_dir, subject_dirname, cmd=cmd)
-            job_options['mem_free'] = '4G'  # mkheadsurf can be as much as 2GB
+            # mkheadsurf can be as much as 2GB
+            job_options.update({'mem_free': '4G'})
 
         self.add_job(cmd, job_name='cfin_flash_bem', **job_options)
 
     def _create_bem_surfaces_watershed(self, subject, analysis_name=None,
                                        atlas=False, gcaatlas=True,
                                        make_coreg_head=False,
-                                       job_options=dict(queue='short.q',
-                                                        n_threads=1)):
+                                       job_options=dict()):
         """Create inner_skull for single subject."""
         subject_dirname = subject
         if analysis_name is not None:
@@ -449,7 +456,8 @@ class Freesurfer(ClusterBatch):
 
         if make_coreg_head:
             cmd = make_coreg_head_commands(bem_dir, subject_dirname, cmd=cmd)
-            job_options['mem_free'] = '4G'  # mkheadsurf can be as much as 2GB
+            # mkheadsurf can be as much as 2GB
+            job_options.update({'mem_free': '4G'})
 
         self.add_job(cmd, job_name='watershed_bem', **job_options)
 
