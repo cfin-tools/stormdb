@@ -11,13 +11,16 @@ Credits:
 # Author: Chris Bailey <cjb@cfin.au.dk>
 #
 # License: BSD (3-clause)
+import os.path as op
 import warnings
 import numpy as np
 
 from mne.io import Raw
 from mne.bem import fit_sphere_to_headshape
 
-from ..base import check_destination_writable, check_source_readable
+from .utils import _get_absolute_proj_path
+from ..base import (check_destination_writable, check_source_readable,
+                    mkdir_p)
 from ..cluster import ClusterBatch
 
 
@@ -39,10 +42,14 @@ class Maxfilter(ClusterBatch):
         Various info
     """
 
-    def __init__(self, proj_name, bad=[], verbose=False):
+    def __init__(self, proj_name, bad=[], log_dir='scratch/qsub_logs',
+                 verbose=False):
         super(Maxfilter, self).__init__(proj_name, verbose=verbose)
 
-        self.info = dict(bad=bad, io_mapping=[])
+        log_dir = _get_absolute_proj_path(log_dir, self.proj_name)
+        mkdir_p(log_dir)
+
+        self.info = dict(bad=bad, log_dir=log_dir, io_mapping=[])
         # Consider placing other vars here
 
     def build_cmd(self, in_fname, out_fname, origin='0 0 40',
@@ -126,6 +133,17 @@ class Maxfilter(ClusterBatch):
         mx_args : str
             Additional command line arguments to pass to MaxFilter
         """
+        if not check_source_readable(in_fname):
+            raise IOError('Input file {} not readable!'.format(in_fname))
+        if not check_destination_writable(out_fname):
+            if check_source_readable(out_fname) and not force:
+                raise IOError('Output file {} exists, use force=True to '
+                              'overwrite!'.format(out_fname))
+            else:
+                raise IOError('Output file {} not writable!'.format(out_fname))
+        else:
+            output_dir = op.dirname(out_fname)
+
         # determine the head origin if necessary
         if origin is None:
             self.logger.info('Estimating head origin from headshape points..')
@@ -232,7 +250,8 @@ class Maxfilter(ClusterBatch):
 
         # NB maxfilter.q hard-coded here, remember to change if cluster changes
         self.add_job(cmd, queue='maxfilter.q', n_threads=n_threads,
-                     job_name='maxfilter')
+                     job_name='maxfilter', log_dir=self.info['log_dir'],
+                     working_dir=output_dir)
         self.info['io_mapping'] += [dict(input=in_fname, output=out_fname)]
 
     def print_input_output_mapping(self):

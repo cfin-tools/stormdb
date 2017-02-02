@@ -169,7 +169,8 @@ class SimNIBS(ClusterBatch):
 
         # default values defined here
         this_job_opts = dict(queue='long.q', n_threads=1,
-                             working_dir=self.info['log_dir'])
+                             working_dir=self.info['output_dir'],
+                             log_dir=self.info['log_dir'])
         if job_options is not None:
             if not isinstance(job_options, dict):
                 raise ValueError('Job options must be given as a dict')
@@ -314,7 +315,8 @@ class SimNIBS(ClusterBatch):
 
         # default values defined here
         this_job_opts = dict(queue='short.q', n_threads=1,
-                             working_dir=self.info['log_dir'])
+                             working_dir=self.info['output_dir'],
+                             log_dir=self.info['log_dir'])
         if job_options is not None:
             if not isinstance(job_options, dict):
                 raise ValueError('Job options must be given as a dict')
@@ -442,7 +444,7 @@ class SimNIBS(ClusterBatch):
                                      head_fname=head_fname)
 
         # One job per subject, since these are "cheap" operations
-        self.add_job(cmd, job_name='meshfix', **job_options)
+        self.add_job(cmd, job_name='cr_bem_simnibs', **job_options)
 
     def _mri2mesh_outputs(self, subject, analysis_name):
         if analysis_name is not None:

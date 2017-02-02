@@ -25,7 +25,7 @@ QSUB_SCHEMA = """
 # Operate in current working directory
 {cwd_flag:s}
 #$ -N {job_name:s}
-#$ -o {job_name:s}_$JOB_ID.qsub
+#$ -o {log_name_prefix:s}_$JOB_ID.qsub
 # Merge stdout and stderr
 #$ -j y
 #$ -q {queue:s}
@@ -153,7 +153,7 @@ class ClusterJob(object):
     """
     def __init__(self, cmd=None, proj_name=None, queue='short.q', h_vmem=None,
                  mem_free=None, n_threads=1, working_dir='cwd', job_name=None,
-                 cleanup=True):
+                 log_dir=None, cleanup=True):
         self.cluster = Cluster()
 
         if not cmd:
@@ -174,6 +174,7 @@ class ClusterJob(object):
         self.n_threads = n_threads
         self.h_vmem = h_vmem
         self.mem_free = mem_free
+        self.log_dir = log_dir
 
         self._qsub_schema = QSUB_SCHEMA
         self._qsub_script = None
@@ -190,6 +191,7 @@ class ClusterJob(object):
         opt_h_vmem_flag = ""
         opt_mem_free_flag = ""
         cwd_flag = ''
+        log_name_prefix = ''
         if self.n_threads > 1:
             self.cluster._check_parallel_env(self.queue, 'threaded')
             opt_threaded_flag = "#$ -pe threaded {:d}".format(self.n_threads)
@@ -207,10 +209,15 @@ class ClusterJob(object):
             else:
                 enforce_path_exists(working_dir)
                 cwd_flag = '#$ -wd {:s}'.format(working_dir)
+        if self.log_dir is not None:
+            if not os.path.exists(self.log_dir):
+                raise ValueError(
+                    'Log directory {} does not exist.'.format(self.log_dir))
+            log_name_prefix = os.path.join(log_dir, job_name)
 
         self._create_qsub_script(job_name, cwd_flag,
                                  opt_threaded_flag, opt_h_vmem_flag,
-                                 opt_mem_free_flag)
+                                 opt_mem_free_flag, log_name_prefix)
 
     @property
     def cmd(self):
@@ -233,11 +240,12 @@ class ClusterJob(object):
             self._cmd = value
 
     def _create_qsub_script(self, job_name, cwd_flag, opt_threaded_flag,
-                            opt_h_vmem_flag, opt_mem_free_flag):
+                            opt_h_vmem_flag, opt_mem_free_flag,
+                            log_name_prefix):
         """All variables should be defined"""
         if (self.cmd is None or self.queue is None or job_name is None or
                 cwd_flag is None or opt_threaded_flag is None or
-                opt_h_vmem_flag is None):
+                opt_h_vmem_flag is None or opt_mem_free_flag is None):
             raise ValueError('This should not happen, please report an Issue!')
 
         self._qsub_script =\
@@ -245,6 +253,7 @@ class ClusterJob(object):
                                      opt_h_vmem_flag=opt_h_vmem_flag,
                                      opt_mem_free_flag=opt_mem_free_flag,
                                      cwd_flag=cwd_flag, queue=self.queue,
+                                     log_name_prefix=log_name_prefix,
                                      exec_cmd=self.cmd, job_name=job_name)
 
     def _write_qsub_job(self, sh_file='~/submit_job.sh'):

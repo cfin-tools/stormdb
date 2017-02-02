@@ -104,7 +104,7 @@ class Freesurfer(ClusterBatch):
 
     def recon_all(self, subject, t1_series=None, hemi='both',
                   directives=['all', '3T'], analysis_name=None,
-                  job_options=dict(queue='long.q', n_threads=1)):
+                  job_options=None):
         """Build a Freesurfer recon-all command for later execution.
 
         Parameters
@@ -130,7 +130,7 @@ class Freesurfer(ClusterBatch):
             Optional suffix to add to subject name (e.g. '_t2mask')
         hemi : str (optional)
             Defaults to 'both'. You may also specify either 'lh' or 'rh'.
-        job_options : dict
+        job_options : dict | None
             Dictionary of optional arguments to pass to ClusterJob. The
             default set of options is:
                 job_options=dict(queue='long.q', n_threads=1)
@@ -158,7 +158,8 @@ class Freesurfer(ClusterBatch):
 
         # default values defined here
         this_job_opts = dict(queue='long.q', n_threads=1,
-                             working_dir=self.info['log_dir'])
+                             working_dir=self.info['subjects_dir'],
+                             log_dir=self.info['log_dir'])
         if job_options is not None:
             if not isinstance(job_options, dict):
                 raise ValueError('Job options must be given as a dict')
@@ -180,7 +181,7 @@ class Freesurfer(ClusterBatch):
 
     def _recon_all(self, subject, t1_series=None, hemi='both',
                    directives='all', analysis_name=None,
-                   job_options=dict(queue='long.q', n_threads=1)):
+                   job_options=dict()):
         "Method for single subjects"
 
         if subject not in self.info['valid_subjects']:
@@ -294,7 +295,8 @@ class Freesurfer(ClusterBatch):
 
         # default values defined here
         this_job_opts = dict(queue='short.q', n_threads=1,
-                             working_dir=self.info['log_dir'])
+                             working_dir=self.info['subjects_dir'],
+                             log_dir=self.info['log_dir'])
         if job_options is not None:
             if not isinstance(job_options, dict):
                 raise ValueError('Job options must be given as a dict')
