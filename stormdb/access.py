@@ -568,8 +568,8 @@ class Query(object):
             if isinstance(study_date_range, string_types):
                 study_date_range = [study_date_range, study_date_range]
             info_dict_list = [s for s in info_dict_list if
-                              s['study'] >= study_date_range[0] and
-                              s['study'] <= study_date_range[1]]
+                              s['study'][:8] >= study_date_range[0] and
+                              s['study'][:8] <= study_date_range[1]]
         return(info_dict_list)
 
     # def generate_output_path(self, relative_path=None):
