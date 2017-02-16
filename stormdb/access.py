@@ -426,7 +426,8 @@ class Query(object):
         return(file_list)
 
     def filter_series(self, description=None, subjects=None, modalities=None,
-                      study_metas=None, return_files=True):
+                      study_date_range=None, study_metas=None,
+                      return_files=True):
         """Select series based on their description (name)
 
         Get list of series (and corresponding files) from database matching
@@ -446,6 +447,9 @@ class Query(object):
         modalities : str | list of str | None
             A string or list or strings identifying one or more modalities of
             the study to get. None is equivalent to all modalities.
+        study_date_range : str | list of str (length==2) | None
+            The date or range of dates to include series from. Should be given
+            in the format YYYYMMDD. If None (default), all series returned.
         study_metas : dict or None
             A dictionary with fields "name", "comparison" and "value", e.g.,
             dict(name='timepoint', comparison='=', value=2). By default all
@@ -560,6 +564,12 @@ class Query(object):
             info_dict = {key: value for (key, value) in info}
             info_dict_list.append(info_dict)
 
+        if study_date_range is not None:
+            if isinstance(study_date_range, string_types):
+                study_date_range = [study_date_range, study_date_range]
+            info_dict_list = [s for s in info_dict_list if
+                              s['study_date'][:8] >= study_date_range[0] and
+                              s['study_date'][:8] <= study_date_range[1]]
         return(info_dict_list)
 
     # def generate_output_path(self, relative_path=None):
