@@ -57,4 +57,5 @@ doc/source/generated
 # PyBuilder
 target/
 
+.ipynb_checkpoints*
 .DS_Store
