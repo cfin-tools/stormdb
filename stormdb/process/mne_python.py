@@ -82,7 +82,7 @@ class MNEPython(ClusterBatch):
 
         script = ("from mne import make_bem_model, make_bem_solution, "
                   "write_bem_solution;"
-                  "surfs = make_bem_model('{subject:s}'{kwargs:});"
+                  "surfs = make_bem_model('{subject:s}', ico=None{kwargs:});"
                   "bem = make_bem_solution(surfs);"
                   "write_bem_solution('{bem_fname:s}', bem)")
         filtargs = ', '.join("{!s}={!r}".format(key, val) for

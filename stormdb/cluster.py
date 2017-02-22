@@ -191,7 +191,6 @@ class ClusterJob(object):
         opt_h_vmem_flag = ""
         opt_mem_free_flag = ""
         cwd_flag = ''
-        log_name_prefix = ''
         if self.n_threads > 1:
             self.cluster._check_parallel_env(self.queue, 'threaded')
             opt_threaded_flag = "#$ -pe threaded {:d}".format(self.n_threads)
@@ -203,6 +202,8 @@ class ClusterJob(object):
             opt_mem_free_flag = "#$ -l mem_free={:s}".format(self.mem_free)
         if job_name is None:
             job_name = 'py-wrapper'
+        log_name_prefix = job_name
+
         if working_dir is not None and isinstance(working_dir, string_types):
             if working_dir == 'cwd':
                 cwd_flag = '#$ -cwd'
