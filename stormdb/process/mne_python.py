@@ -114,22 +114,50 @@ class MNEPython(ClusterBatch):
         self.info['io_mapping'] += [dict(input=subject, output=bem_fname)]
 
     def make_forward_solution(self, meas_fname, trans_fname, bem_fname,
-                              fwd_fname, **kwargs):
+                              src_fname, fwd_fname, **kwargs):
+        """mne.make_forward_solution
+
+        Parameters
+        ----------
+        meas_fname : str
+            Filename to a Raw, Epochs, or Evoked file with measurement
+            information.
+        trans_fname : str
+            A transformation filename.
+        bem_fname : str
+            A solved BEM filename.
+        src_fname : str
+            The full path to the source space.
+        fwd_fname : str
+            The full path to the forward model file to save.
+        meg : bool
+            If True (Default), include MEG computations.
+        eeg : bool
+            If True (Default), include EEG computations.
+        mindist : float
+            Minimum distance of sources from inner skull surface (in mm).
+        ignore_ref : bool
+            If True, do not include reference channels in compensation. This
+            option should be True for KIT files, since forward computation
+            with reference channels is not currently supported.
+        """
         for fname in (meas_fname, trans_fname, bem_fname):
             if not check_source_readable(fname):
                 raise IOError('Input file {} not readable!'.format(fname))
         if not check_destination_writable(fwd_fname):
             raise IOError('Output file {} not writable!'.format(bem_fname))
 
-        script = ("from mne import make_forward_solution;"
-                  "make_forward_solution('{meas:s}', '{trans:s}', "
-                  "'{bem:s}', fname='{fwd:s}'{kwargs:});")
+        script = ("from mne import make_forward_solution, "
+                  "write_forward_solution;"
+                  "fwd = make_forward_solution('{meas:s}', '{trans:s}', "
+                  "'{src:s}', {bem:s}'{kwargs:});"
+                  "write_forward_solution('{fwd:s}', fwd)")
         filtargs = ', '.join("{!s}={!r}".format(key, val) for
                              (key, val) in kwargs.items())
         filtargs = ', ' + filtargs if len(kwargs) > 0 else filtargs
         cmd = "python -c \""
         cmd += script.format(meas=meas_fname, trans=trans_fname, bem=bem_fname,
-                             fwd=fwd_fname, kwargs=filtargs)
+                             src=src_fname, fwd=fwd_fname, kwargs=filtargs)
         cmd += "\""
 
         self.add_job(cmd, n_threads=1, job_name='mne.fwd_solve')
