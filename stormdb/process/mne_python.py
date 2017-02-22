@@ -113,3 +113,4 @@ class MNEPython(ClusterBatch):
             subjects_dir = _get_absolute_proj_path(kwargs['subjects_dir'],
                                                    self.proj_name)
             os.environ['SUBJECTS_DIR'] = subjects_dir
+        return subjects_dir
