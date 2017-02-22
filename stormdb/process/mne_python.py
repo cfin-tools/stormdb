@@ -3,7 +3,7 @@ from .utils import (_get_absolute_proj_path)
 from ..base import (enforce_path_exists, check_destination_writable,
                     check_source_readable)
 from ..cluster import ClusterBatch
-
+from mne import make_bem_model, make_bem_solution
 
 class MNEPython(ClusterBatch):
     """Clusterised mne-python commands.
@@ -12,6 +12,12 @@ class MNEPython(ClusterBatch):
         super(MNEPython, self).__init__(proj_name, verbose=verbose)
 
         self.info = dict(bad=bad, io_mapping=[])
+
+        # Get docstring for various mne-goodies
+        doc = ClusterJob.__doc__
+        doc = doc[doc.find('\n'):]  # Strip first line
+        doc = "Add a ClusterJob to the list (batch) of jobs." + doc
+        self.add_job.__func__.__doc__ = doc
 
     def raw_filter(self, in_fname, out_fname, l_freq, h_freq, **kwargs):
         if not check_source_readable(in_fname):
@@ -57,13 +63,31 @@ class MNEPython(ClusterBatch):
         self.info['io_mapping'] += [dict(input=subject, output=src_fname)]
 
     def prepare_bem_model(self, subject, bem_fname, **kwargs):
+        """Create and solve a BEM using mne-python
+
+        Parameters
+        ----------
+        subject : str
+            The ID of the subject.
+        bem_fname : str
+            The full path to the solved BEM. To conform to the MNE naming
+            conventions, the file should be placed in the bem-folder of
+            the Freesurfer subjects-dir, and end with '-sol.fif'
+        conductivity : array of int, shape (3,) or (1,)
+            The conductivities to use for each shell. Should be a single
+            element for a one-layer model, or three elements for a three-layer
+            model. Defaults to [0.3, 0.006, 0.3]. The MNE-C default for a
+            single-layer model would be [0.3].
+        subjects_dir : string, or None
+            Path to SUBJECTS_DIR if it is not set in the environment.
+        """
         subjects_dir = self._triage_subjects_dir_from_kwargs(kwargs)
         enforce_path_exists(os.path.join(subjects_dir, subject))
         if not check_destination_writable(bem_fname):
             raise IOError('Output file {0} not writable!'.format(bem_fname))
 
-        script = ("from mne import (make_bem_model, make_bem_solution, "
-                  "write_bem_solution);\n"
+        script = ("from mne import make_bem_model, make_bem_solution, "
+                  "write_bem_solution;\n"
                   "surfs = make_bem_model('{subject:s}'{kwargs:});\n"
                   "bem = make_bem_solution(surfs);\n"
                   "write_bem_solution('{bem_fname:s}', bem)\n")
