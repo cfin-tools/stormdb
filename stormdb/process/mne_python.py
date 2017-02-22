@@ -81,10 +81,10 @@ class MNEPython(ClusterBatch):
             raise IOError('Output file {0} not writable!'.format(bem_fname))
 
         script = ("from mne import make_bem_model, make_bem_solution, "
-                  "write_bem_solution;\n"
-                  "surfs = make_bem_model('{subject:s}'{kwargs:});\n"
-                  "bem = make_bem_solution(surfs);\n"
-                  "write_bem_solution('{bem_fname:s}', bem)\n")
+                  "write_bem_solution;"
+                  "surfs = make_bem_model('{subject:s}'{kwargs:});"
+                  "bem = make_bem_solution(surfs);"
+                  "write_bem_solution('{bem_fname:s}', bem)")
         filtargs = ', '.join("{!s}={!r}".format(key, val) for
                              (key, val) in kwargs.items())
         filtargs = ', ' + filtargs if len(kwargs) > 0 else filtargs
