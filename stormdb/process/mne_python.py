@@ -110,6 +110,6 @@ class MNEPython(ClusterBatch):
                                  'or by setting the SUBJECT_DIR environment '
                                  'variable. The directory must exist.')
         else:
-            subjects_dir = _get_absolute_proj_path(subjects_dir,
+            subjects_dir = _get_absolute_proj_path(kwargs['subjects_dir'],
                                                    self.proj_name)
             os.environ['SUBJECTS_DIR'] = subjects_dir
