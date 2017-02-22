@@ -35,16 +35,33 @@ class MNEPython(ClusterBatch):
         self.info['io_mapping'] += [dict(input=in_fname, output=out_fname)]
 
     def setup_source_space(self, subject, src_fname, **kwargs):
+        """mne.setup_source_space
 
+        Parameters
+        ----------
+        subject : str
+            Subject to process.
+        spacing : str
+            The spacing to use. Can be ``'ico#'`` for a recursively subdivided
+            icosahedron, ``'oct#'`` for a recursively subdivided octahedron,
+            or ``'all'`` for all points.
+        surface : str
+            The surface to use (defaults to 'white').
+        subjects_dir : string, or None
+            Path to SUBJECTS_DIR if it is not set in the environment.
+        add_dist : bool
+            Add distance and patch information to the source space. This takes
+            some time so precomputing it is recommended.
+        """
         subjects_dir = self._triage_subjects_dir_from_kwargs(kwargs)
 
         enforce_path_exists(os.path.join(subjects_dir, subject))
         if not check_destination_writable(src_fname):
             raise IOError('Output file {0} not writable!'.format(src_fname))
 
-        script = ("from mne import setup_source_space;"
-                  "setup_source_space('{subject:s}', fname='{src_fname:s}'"
-                  "{kwargs:});")
+        script = ("from mne import setup_source_space, write_source_spaces;"
+                  "src = setup_source_space('{subject:s}'{kwargs:});"
+                  "write_source_spaces(src, '{src_fname:s}')")
         filtargs = ', '.join("{!s}={!r}".format(key, val) for
                              (key, val) in kwargs.items())
         filtargs = ', ' + filtargs if len(kwargs) > 0 else filtargs
@@ -104,9 +121,9 @@ class MNEPython(ClusterBatch):
         if not check_destination_writable(fwd_fname):
             raise IOError('Output file {} not writable!'.format(bem_fname))
 
-        script = ("from mne import make_forward_solution;\n"
+        script = ("from mne import make_forward_solution;"
                   "make_forward_solution('{meas:s}', '{trans:s}', "
-                  "'{bem:s}', fname='{fwd:s}'{kwargs:});\n")
+                  "'{bem:s}', fname='{fwd:s}'{kwargs:});")
         filtargs = ', '.join("{!s}={!r}".format(key, val) for
                              (key, val) in kwargs.items())
         filtargs = ', ' + filtargs if len(kwargs) > 0 else filtargs
