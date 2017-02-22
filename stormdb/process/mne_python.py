@@ -3,7 +3,7 @@ from .utils import (_get_absolute_proj_path)
 from ..base import (enforce_path_exists, check_destination_writable,
                     check_source_readable)
 from ..cluster import ClusterBatch
-from mne import make_bem_model, make_bem_solution
+
 
 class MNEPython(ClusterBatch):
     """Clusterised mne-python commands.
@@ -12,12 +12,6 @@ class MNEPython(ClusterBatch):
         super(MNEPython, self).__init__(proj_name, verbose=verbose)
 
         self.info = dict(bad=bad, io_mapping=[])
-
-        # Get docstring for various mne-goodies
-        doc = ClusterJob.__doc__
-        doc = doc[doc.find('\n'):]  # Strip first line
-        doc = "Add a ClusterJob to the list (batch) of jobs." + doc
-        self.add_job.__func__.__doc__ = doc
 
     def raw_filter(self, in_fname, out_fname, l_freq, h_freq, **kwargs):
         if not check_source_readable(in_fname):
