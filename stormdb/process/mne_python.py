@@ -8,7 +8,7 @@ from ..cluster import ClusterBatch
 class MNEPython(ClusterBatch):
     """Clusterised mne-python commands.
     """
-    def __init__(self, proj_name, bad=[], verbose=True):
+    def __init__(self, proj_name, bad=[], verbose=False):
         super(MNEPython, self).__init__(proj_name, verbose=verbose)
 
         self.info = dict(bad=bad, io_mapping=[])
