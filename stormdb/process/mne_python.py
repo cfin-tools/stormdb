@@ -41,6 +41,10 @@ class MNEPython(ClusterBatch):
         ----------
         subject : str
             Subject to process.
+        src_fname : str
+            The full path to the calculated source space(s). To conform to the
+            MNE naming conventions, the file should be placed in the bem-folder
+            of the Freesurfer subjects-dir, and end with '-src.fif'
         spacing : str
             The spacing to use. Can be ``'ico#'`` for a recursively subdivided
             icosahedron, ``'oct#'`` for a recursively subdivided octahedron,
@@ -59,8 +63,11 @@ class MNEPython(ClusterBatch):
         if not check_destination_writable(src_fname):
             raise IOError('Output file {0} not writable!'.format(src_fname))
 
+        # NB Deprecation warning! after mne-python 0.15, the fname=None should
+        # probably be removed
         script = ("from mne import setup_source_space, write_source_spaces;"
-                  "src = setup_source_space('{subject:s}'{kwargs:});"
+                  "src = setup_source_space('{subject:s}', "
+                  "fname=None{kwargs:});"
                   "write_source_spaces(src, '{src_fname:s}')")
         filtargs = ', '.join("{!s}={!r}".format(key, val) for
                              (key, val) in kwargs.items())
