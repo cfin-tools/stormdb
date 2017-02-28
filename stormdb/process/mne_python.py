@@ -150,7 +150,7 @@ class MNEPython(ClusterBatch):
         script = ("from mne import make_forward_solution, "
                   "write_forward_solution;"
                   "fwd = make_forward_solution('{meas:s}', '{trans:s}', "
-                  "'{src:s}', {bem:s}'{kwargs:});"
+                  "'{src:s}', '{bem:s}'{kwargs:});"
                   "write_forward_solution('{fwd:s}', fwd)")
         filtargs = ', '.join("{!s}={!r}".format(key, val) for
                              (key, val) in kwargs.items())
