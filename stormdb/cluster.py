@@ -196,6 +196,8 @@ class ClusterJob(object):
 
         if queue not in self.cluster.queues:
             raise ValueError('Unknown queue ({0})!'.format(queue))
+
+        # NB Obsolete, delete?
         if queue in self.cluster._highmem_qs and h_vmem is None:
             raise RuntimeError('You must specify the anticipated memory '
                                'usage for the {:s} queue using the option: '
@@ -232,17 +234,22 @@ class ClusterJob(object):
             # opt_h_vmem_flag = "#$ -l h_vmem={:s}".format(self.h_vmem)
             _, totmem, totmem_unit = re.split('(\d+)', self.total_memory)
             _, memlim, memlim_unit = \
-                re.split('(\d+)', self.get_memlimit_per_process(self.queue))
+                re.split('(\d+)',
+                         self.cluster.get_memlimit_per_process(self.queue))
 
             if totmem_unit != memlim_unit:
                 units = dict(k=1e3, m=1e6, g=1e9, t=1e12)
                 try:
                     ratio = units[totmem_unit.lower()] /\
                                 units[memlim_unit.lower()]
-                except KeyError(
-                    'Something is wrong with the memory units, likely {:s}'
-                    .format(self.total_memory))
-            self.n_threads = math.ceil(ratio * float(totmem) / float(memlim))
+                except KeyError:
+                    raise ValueError('Something is wrong with the memory units,'
+                                     ' likely {:s}'.format(self.total_memory))
+            else:
+                ratio = 1.
+                    
+            self.n_threads = int(math.ceil(ratio * float(totmem)
+                                           / float(memlim)))
 
         if self.n_threads > 1:
             self.cluster._check_parallel_env(self.queue, 'threaded')
