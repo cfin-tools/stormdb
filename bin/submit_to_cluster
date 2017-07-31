@@ -7,12 +7,13 @@ from os import environ
 
 parser = ArgumentParser()
 parser.add_argument('-n', '--n_threads', type=int,
-                    default=1, help='Number of threads to run per process')
+                    default=1, help='Number of threads to run per process.')
 parser.add_argument('-q', '--queue', type=str, default='short.q',
                     help='Name of queue to submit to')
-parser.add_argument('-m', '--h_vmem', type=str, default=None,
+parser.add_argument('-m', '--total_memory', type=str, default=None,
                     help=('Amount of virtual memory per thread to request. '
-                          'Format: M=megabytes, G=gigabytes (e.g. 30G).'))
+                          'Format: M=megabytes, G=gigabytes (e.g. 30G). '
+                          'See docstring of `ClusterJob` for details!'))
 parser.add_argument('-p', '--project', type=str, default=None,
                     help='Name of project (or set MINDLABPROJ)')
 parser.add_argument('-w', '--working_dir', type=str, default='cwd',
@@ -37,12 +38,13 @@ if args.project is None:
 else:
     proj_name = args.project
 # basic check of the memory-argument
-if args.h_vmem is not None:
-    if (not args.h_vmem.startswith(tuple('%d' % ii for ii in range(1, 10))) or
-            not args.h_vmem.upper().endswith(('M', 'G'))):
-        raise ValueError('Bad memory format: {:s}'.format(args.h_vmem))
+if args.total_memory is not None:
+    if (not args.total_memory.startswith(
+        tuple('%d' % ii for ii in range(1, 10))) or
+            not args.total_memory.upper().endswith(('M', 'G', 'T'))):
+        raise ValueError('Bad memory format: {:s}'.format(args.total_memory))
 
 job = ClusterJob(args.exec_cmd, proj_name=proj_name, n_threads=args.n_threads,
-                 cleanup=args.noclean, queue=args.queue, h_vmem=args.h_vmem,
-                 working_dir=args.working_dir)
+                 cleanup=args.noclean, queue=args.queue,
+                 total_memory=args.total_memory, working_dir=args.working_dir)
 job.submit()
