@@ -197,12 +197,6 @@ class ClusterJob(object):
         if queue not in self.cluster.queues:
             raise ValueError('Unknown queue ({0})!'.format(queue))
 
-        # NB Obsolete, delete?
-        if queue in self.cluster._highmem_qs and h_vmem is None:
-            raise RuntimeError('You must specify the anticipated memory '
-                               'usage for the {:s} queue using the option: '
-                               'h_vmem'.format(queue))
-
         self.queue = queue
         self.n_threads = n_threads
         self.total_memory = total_memory
@@ -247,9 +241,9 @@ class ClusterJob(object):
                                      ' likely {:s}'.format(self.total_memory))
             else:
                 ratio = 1.
-                    
-            self.n_threads = int(math.ceil(ratio * float(totmem)
-                                           / float(memlim)))
+
+            self.n_threads = int(math.ceil(ratio * float(totmem) /
+                                           float(memlim)))
 
         if self.n_threads > 1:
             self.cluster._check_parallel_env(self.queue, 'threaded')
