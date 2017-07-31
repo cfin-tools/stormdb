@@ -12,6 +12,7 @@ import sys
 import logging
 import subprocess as subp
 import re
+import math
 from six import string_types
 from os.path import expanduser
 from .access import Query
@@ -89,7 +90,19 @@ class Cluster(object):
         return(self._query('qconf -spl'))
 
     def get_memlimit_per_process(self, queue):
-        """Get value of h_vmem (memory limit/process) for specified queue."""
+        """Get value of h_vmem (memory limit/process) for specified queue.
+
+        Parameters
+        ----------
+        queue : str
+            Name of the queue (use `Cluster().queues` for a list of queues.)
+
+        Returns
+        -------
+        memlimit : string
+            A string defining the memory limit per process for jobs in the
+            queue. The format is in the style "8G".
+        """
         if queue not in self.queues:
             raise ValueError('Unknown queue: {:s}'.format(queue))
 
@@ -135,13 +148,16 @@ class ClusterJob(object):
         environment.
     queue : str
         The name of the queue to submit the job to (default: 'short.q').
-    h_vmem : str | None
-        Specify the limit on the amount of combined memory consumed by all
-        the processes in the job. This parameter only has an effect for queues
-        that support setting the parameter. The format is in the style "50G".
+    total_memory : str | None
+        The amount of memory required for the job (format is in the style
+        "50G"). NB: If this option is set, only single-threaded jobs are
+        allowed (n_threads must be 1)! The job may, however, still use
+        threaded code (such as a Matlab parfor-loop or MKL-accelerated
+        python numerical libraries).
     n_threads : int
-        If > 1 (default), the job must be submitted to a queue that is capable
-        of multi-threaded parallelism.
+        Number of parallel, concurrent processes consumed by the job (default:
+        1). NB: the memory limit per process is fixed for each queue (see:
+        `Cluster.get_memlimit_per_process(queue_name)`).
     working_dir : str
         Set the job's working directory. May either be an existing path, or
         'cwd' for current working directory (default: 'cwd').
@@ -160,13 +176,14 @@ class ClusterJob(object):
     queue : str
         The name of the queue the job will be submitted to.
     n_threads : int
-        Number of threads to run on.
+        Number of threads to allocate.
     cmd : str
         The command (if several, separated by ';') to be submitted (cannot
         be modified once defined).
     """
-    def __init__(self, cmd=None, proj_name=None, queue='short.q', h_vmem=None,
-                 mem_free=None, n_threads=1, working_dir='cwd', job_name=None,
+    def __init__(self, cmd=None, proj_name=None, queue='short.q',
+                 total_memory=None, n_threads=1,
+                 mem_free=None, working_dir='cwd', job_name=None,
                  log_dir=None, cleanup=True):
         self.cluster = Cluster()
 
@@ -186,8 +203,8 @@ class ClusterJob(object):
 
         self.queue = queue
         self.n_threads = n_threads
-        self.h_vmem = h_vmem
-        self.mem_free = mem_free
+        self.total_memory = total_memory
+        # self.mem_free = mem_free
         self.log_dir = log_dir
 
         self._qsub_schema = QSUB_SCHEMA
@@ -202,18 +219,38 @@ class ClusterJob(object):
         self._cleanup_qsub_job = cleanup
 
         opt_threaded_flag = ""
-        opt_h_vmem_flag = ""
-        opt_mem_free_flag = ""
+        opt_h_vmem_flag = ""  # NB get rid of this!
+        opt_mem_free_flag = ""  # NB get rid of this!
         cwd_flag = ''
+
+        if self.total_memory is not None:
+            if self.n_threads > 1:
+                raise ValueError(
+                    'Maximum number of parallel threads is one (1) when total '
+                    'memory consumption is specified.')
+            # XXX would be nice with some sanity checking here...
+            # opt_h_vmem_flag = "#$ -l h_vmem={:s}".format(self.h_vmem)
+            _, totmem, totmem_unit = re.split('(\d+)', self.total_memory)
+            _, memlim, memlim_unit = \
+                re.split('(\d+)', self.get_memlimit_per_process(self.queue))
+
+            if totmem_unit != memlim_unit:
+                units = dict(k=1e3, m=1e6, g=1e9, t=1e12)
+                try:
+                    ratio = units[totmem_unit.lower()] /\
+                                units[memlim_unit.lower()]
+                except KeyError(
+                    'Something is wrong with the memory units, likely {:s}'
+                    .format(self.total_memory))
+            self.n_threads = math.ceil(ratio * float(totmem) / float(memlim))
+
         if self.n_threads > 1:
             self.cluster._check_parallel_env(self.queue, 'threaded')
             opt_threaded_flag = "#$ -pe threaded {:d}".format(self.n_threads)
-        if self.h_vmem is not None:
-            # XXX would be nice with some sanity checking here...
-            opt_h_vmem_flag = "#$ -l h_vmem={:s}".format(self.h_vmem)
-        if self.mem_free is not None:
-            # XXX would be nice with some sanity checking here...
-            opt_mem_free_flag = "#$ -l mem_free={:s}".format(self.mem_free)
+
+        # if self.mem_free is not None:
+        #     # XXX would be nice with some sanity checking here...
+        #     opt_mem_free_flag = "#$ -l mem_free={:s}".format(self.mem_free)
         if job_name is None:
             job_name = 'py-wrapper'
         log_name_prefix = job_name
