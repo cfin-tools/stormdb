@@ -88,6 +88,12 @@ class Cluster(object):
     def parallel_envs(self):
         return(self._query('qconf -spl'))
 
+    def get_memlimit_per_process(self, queue):
+        """Get value of h_vmem (memory limit/process) for specified queue."""
+        lim = self._query('qconf -sq ' + queue +
+                          '| grep h_vmem | awk {\'print $2\'}')[0]
+        return(lim)
+
     def _check_parallel_env(self, queue, pe_name):
         """Check that a PE is in the pe_list for a given queue"""
         pes = self._query('qconf -sq ' + queue +
@@ -126,7 +132,7 @@ class ClusterJob(object):
         the processes in the job. This parameter only has an effect for queues
         that support setting the parameter. The format is in the style "50G".
     n_threads : int
-        If > 1 (default), the job must be submitted to a queue that is capapble
+        If > 1 (default), the job must be submitted to a queue that is capable
         of multi-threaded parallelism.
     working_dir : str
         Set the job's working directory. May either be an existing path, or
