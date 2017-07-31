@@ -90,8 +90,16 @@ class Cluster(object):
 
     def get_memlimit_per_process(self, queue):
         """Get value of h_vmem (memory limit/process) for specified queue."""
+        if queue not in self.queues:
+            raise ValueError('Unknown queue: {:s}'.format(queue))
+
         lim = self._query('qconf -sq ' + queue +
                           '| grep h_vmem | awk {\'print $2\'}')[0]
+
+        _, lim_int, lim_units = re.split('(\d+)', lim)
+        assert isinstance(int(lim_int), int)
+        assert isinstance(lim_units, string_types)
+
         return(lim)
 
     def _check_parallel_env(self, queue, pe_name):
