@@ -262,6 +262,10 @@ class ClusterJob(object):
             else:
                 enforce_path_exists(working_dir)
                 cwd_flag = '#$ -wd {:s}'.format(working_dir)
+            # finally, check that we can write the log here!
+            if not os.access(working, os.W_OK):
+                raise RuntimeError('Current working directory not writeable!')
+
         if self.log_dir is not None:
             if not os.path.exists(self.log_dir):
                 raise ValueError(
