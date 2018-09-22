@@ -18,7 +18,6 @@ from os.path import expanduser
 from .access import Query
 from .base import enforce_path_exists
 
-
 QSUB_SCHEMA = """
 #$ -S /bin/bash
 # Pass on all environment variables
@@ -60,6 +59,7 @@ class Cluster(object):
     parallel_envs : list
         List of parallel environment names names defined on cluster.
     """
+
     def __init__(self, name='hyades'):
         self.name = name
         self._highmem_qs = ['highmem.q']
@@ -67,26 +67,24 @@ class Cluster(object):
     def _query(self, cmd):
         """Return list of outputs from a shell call"""
         try:
-            output = subp.check_output([cmd],
-                                       stderr=subp.STDOUT, shell=True)
+            output = subp.check_output([cmd], stderr=subp.STDOUT, shell=True)
         except subp.CalledProcessError as cpe:
             raise RuntimeError('Command {:s} failed with error code {:d}, '
-                               'output is:\n\n{:s}'.format(cmd,
-                                                           cpe.returncode,
-                                                           cpe.output))
+                               'output is:\n\n{:s}'.format(
+                                   cmd, cpe.returncode, cpe.output))
         # NB the decode-step here is important: in Py3, check_output
         # returns a byte-string! This is tested to work on Py2
         output = output.decode('ascii', 'ignore')
         # first strip whitespace (incl. \n), then split on newline
-        return(output.rstrip().split('\n'))
+        return (output.rstrip().split('\n'))
 
     @property
     def queues(self):
-        return(self._query('qconf -sql'))
+        return (self._query('qconf -sql'))
 
     @property
     def parallel_envs(self):
-        return(self._query('qconf -spl'))
+        return (self._query('qconf -spl'))
 
     def get_memlimit_per_process(self, queue):
         """Get value of h_vmem (memory limit/process) for specified queue.
@@ -112,7 +110,7 @@ class Cluster(object):
         assert isinstance(int(lim_int), int)
         assert isinstance(lim_units, string_types)
 
-        return(lim)
+        return (lim)
 
     def _check_parallel_env(self, queue, pe_name):
         """Check that a PE is in the pe_list for a given queue"""
@@ -130,9 +128,15 @@ class Cluster(object):
         q_list = []
         for q in loads:
             qq = q.split()
-            q_list += [dict(name=qq[0], load=qq[1], used=qq[2], avail=qq[4],
-                            total=qq[5])]
-        return(q_list)
+            q_list += [
+                dict(
+                    name=qq[0],
+                    load=qq[1],
+                    used=qq[2],
+                    avail=qq[4],
+                    total=qq[5])
+            ]
+        return (q_list)
 
 
 class ClusterJob(object):
@@ -180,16 +184,24 @@ class ClusterJob(object):
         The command (if several, separated by ';') to be submitted (cannot
         be modified once defined).
     """
-    def __init__(self, cmd=None, proj_name=None, queue='short.q',
-                 total_memory=None, n_threads=1,
-                 mem_free=None, working_dir='cwd', job_name=None,
-                 log_dir=None, cleanup=True):
+
+    def __init__(self,
+                 cmd=None,
+                 proj_name=None,
+                 queue='short.q',
+                 total_memory=None,
+                 n_threads=1,
+                 mem_free=None,
+                 working_dir='cwd',
+                 job_name=None,
+                 log_dir=None,
+                 cleanup=True):
         self.cluster = Cluster()
 
         if not cmd:
-            raise(ValueError('You must specify the command to run!'))
+            raise (ValueError('You must specify the command to run!'))
         if not proj_name:
-            raise(ValueError('Jobs are associated with a specific project.'))
+            raise (ValueError('Jobs are associated with a specific project.'))
         Query(proj_name)._check_login_credentials()
         self.proj_name = proj_name
 
@@ -240,8 +252,8 @@ class ClusterJob(object):
             else:
                 ratio = 1.
 
-            self.n_threads = int(math.ceil(ratio * float(totmem) /
-                                           float(memlim)))
+            self.n_threads = int(
+                math.ceil(ratio * float(totmem) / float(memlim)))
 
         if self.n_threads > 1:
             self.cluster._check_parallel_env(self.queue, 'threaded')
@@ -259,13 +271,14 @@ class ClusterJob(object):
                 cwd_flag = '#$ -wd {:s}'.format(working_dir)
             # finally, check that we can write the log here!
             if not os.access(working_dir, os.W_OK):
-                raise RuntimeError('Current working directory not writeable! '
-                        'Change directory to somewhere you can write to.')
+                raise RuntimeError(
+                    'Current working directory not writeable! '
+                    'Change directory to somewhere you can write to.')
 
         if self.log_dir is not None:
             if not os.path.exists(self.log_dir):
-                raise ValueError(
-                    'Log directory {} does not exist.'.format(self.log_dir))
+                raise ValueError('Log directory {} does not exist.'.format(
+                    self.log_dir))
             log_name_prefix = os.path.join(self.log_dir, job_name)
 
         self._create_qsub_script(job_name, cwd_flag, opt_threaded_flag,
@@ -294,9 +307,9 @@ class ClusterJob(object):
     def _create_qsub_script(self, job_name, cwd_flag, opt_threaded_flag,
                             opt_h_vmem_flag, log_name_prefix):
         """All variables should be defined"""
-        if (self.cmd is None or self.queue is None or job_name is None or
-                cwd_flag is None or opt_threaded_flag is None or
-                opt_h_vmem_flag is None):
+        if (self.cmd is None or self.queue is None or job_name is None
+                or cwd_flag is None or opt_threaded_flag is None
+                or opt_h_vmem_flag is None):
             raise ValueError('This should not happen, please report an Issue!')
 
         self._qsub_script =\
@@ -342,11 +355,12 @@ class ClusterJob(object):
         self._write_qsub_job()
         try:
             output = subp.check_output(['qsub', expanduser(sh_file)],
-                                       stderr=subp.STDOUT, shell=False)
+                                       stderr=subp.STDOUT,
+                                       shell=False)
         except subp.CalledProcessError as cpe:
             raise RuntimeError('qsub submission failed with error code {:d}, '
-                               'output is:\n\n{:s}'.format(cpe.returncode,
-                                                           cpe.output))
+                               'output is:\n\n{:s}'.format(
+                                   cpe.returncode, cpe.output))
         else:
             # py2-3 safety
             output = output.decode('ascii', 'ignore').rstrip()
@@ -360,7 +374,7 @@ class ClusterJob(object):
     @property
     def status(self):
         self._check_status()
-        return(self._status_msg)
+        return (self._status_msg)
 
     def _check_status(self):
         if self._completed:
@@ -370,8 +384,8 @@ class ClusterJob(object):
                                      ' | awk \'{print $5, $8}\'')[0]  # ONLY
 
         if len(output) == 0:
-            if (self._submitted and not self._running and
-                    not self._completed and not self._waiting):
+            if (self._submitted and not self._running and not self._completed
+                    and not self._waiting):
                 self._status_msg = ('Submission failed, see log for'
                                     ' output errors!')
             elif self._submitted and not self._completed:
@@ -388,8 +402,8 @@ class ClusterJob(object):
                 self._running = True
                 self._waiting = False
                 self._completed = False
-                self._status_msg = 'Running on {0} ({1})'.format(exechost,
-                                                                 queuename)
+                self._status_msg = 'Running on {0} ({1})'.format(
+                    exechost, queuename)
             elif runcode == 'qw':
                 self._running = False
                 self._waiting = True
@@ -407,7 +421,8 @@ class ClusterJob(object):
         if self._submitted and (self._running or self._waiting):
             try:
                 subp.check_output(['qdel {0}'.format(self._jobid)],
-                                  stderr=subp.STDOUT, shell=True)
+                                  stderr=subp.STDOUT,
+                                  shell=True)
             except subp.CalledProcessError:
                 raise RuntimeError('This should not happen, report Issue!')
             else:
@@ -424,6 +439,7 @@ class ClusterBatch(object):
 
     This docstring should be overwritten by the children.
     """
+
     def __init__(self, proj_name, verbose=False):
         self.cluster = Cluster()
         # let fail if bad proj_name
@@ -466,8 +482,8 @@ class ClusterBatch(object):
     def kill(self, jobid=None):
         """Kill (delete) all the jobs in the batch."""
         for job in self._joblist:
-            if (jobid is None or
-                    (jobid is not None and int(job._jobid) == int(jobid))):
+            if (jobid is None
+                    or (jobid is not None and int(job._jobid) == int(jobid))):
                 job.kill()
 
     def build_cmd(self):
@@ -489,8 +505,8 @@ class ClusterBatch(object):
         """Print status of cluster jobs."""
         for ij, job in enumerate(self._joblist):
             self.logger.info('#{ij:d} ({jid:}): '
-                             '{jst}'.format(ij=ij + 1, jid=job._jobid,
-                                            jst=job.status))
+                             '{jst}'.format(
+                                 ij=ij + 1, jid=job._jobid, jst=job.status))
             self.logger.debug('\t{0}'.format(job.cmd))
 
     def submit(self, fake=False):
