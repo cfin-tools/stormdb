@@ -46,9 +46,11 @@ def parse_arguments(func):
     n_pos = len(argspec.args) - len(argspec.defaults)
     # args = argspec.args[1:n_pos]  # drop self
     args = argspec.args[:n_pos]  # drop self
-    kwargs = {key: val for key, val in zip(argspec.args[n_pos:],
-                                           argspec.defaults)}
-    return(args, kwargs)
+    kwargs = {
+        key: val
+        for key, val in zip(argspec.args[n_pos:], argspec.defaults)
+    }
+    return (args, kwargs)
 
 
 def mkdir_p(pth):
@@ -63,8 +65,8 @@ def mkdir_p(pth):
 
 
 def _get_unique_series(qy, series_name, subject, modality):
-    series = qy.filter_series(description=series_name, subjects=subject,
-                              modalities=modality)
+    series = qy.filter_series(
+        description=series_name, subjects=subject, modalities=modality)
     if len(series) == 0:
         raise RuntimeError('No series found matching {0} for subject '
                            '{1}'.format(series_name, subject))
