@@ -9,6 +9,7 @@ from setuptools import setup, Command
 def read(fname):
     return open(os.path.join(os.path.dirname(__file__), fname)).read()
 
+
 # get the version (don't import mne here, so dependencies are not needed)
 version = None
 with open(os.path.join('stormdb', '__init__.py'), 'r') as fid:
@@ -32,6 +33,7 @@ class CleanCommand(Command):
 
     def run(self):
         os.system('rm -vrf ./build ./dist ./*.pyc ./*.tgz ./*.egg-info')
+
 
 setup(
     name="stormdb",

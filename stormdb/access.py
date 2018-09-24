@@ -137,8 +137,8 @@ class Query(object):
         if response.find(error_str) != -1:
             if response.find('Your login is not working') != -1:
                 # Bad templogin-hash
-                msg = 'Looks like your ~/.stormdblogin is old/broken ' +\
-                      'and will be removed. Please enter your credentials ' +\
+                msg = 'Looks like your ~/.stormdblogin is old/broken ' + \
+                      'and will be removed. Please enter your credentials ' + \
                       'and re-run your query.'
                 warn(msg)
                 try:
@@ -256,11 +256,11 @@ class Query(object):
             raise NameError("subj_type must be 'included', excluded' or 'all'")
 
         url = ('{scode:s}?{login:s}&projectCode={proj:s}&included={incl:d}'.
-               format(
-                   scode=scode,
-                   login=self._login_code,
-                   proj=self.proj_name,
-                   incl=included))
+            format(
+            scode=scode,
+            login=self._login_code,
+            proj=self.proj_name,
+            incl=included))
         output = self._send_request(url)
 
         # Split at '\n'
@@ -275,8 +275,8 @@ class Query(object):
             subj_list = [
                 ser['subjectcode'] for ser in all_series
                 if ser['subjectcode'] not in used and (
-                    used.append(ser['subjectcode']) or True)
-                and ser['subjectcode'] in subj_list
+                        used.append(ser['subjectcode']) or True)
+                   and ser['subjectcode'] in subj_list
             ]
             # The following also works, but is slower?
             # pop_inds = []
@@ -294,8 +294,8 @@ class Query(object):
             subj_list = [
                 ser['subjectcode'] for ser in all_series
                 if ser['subjectcode'] not in used and (
-                    used.append(ser['subjectcode']) or True)
-                and ser['subjectcode'] in subj_list
+                        used.append(ser['subjectcode']) or True)
+                   and ser['subjectcode'] in subj_list
             ]
 
         return (subj_list)
@@ -325,7 +325,7 @@ class Query(object):
         """
 
         url = 'studies?' + self._login_code + \
-            '&projectCode=' + self.proj_name + '&subjectNo=' + subj_id
+              '&projectCode=' + self.proj_name + '&subjectNo=' + subj_id
         output = self._send_request(url)
 
         # Split at '\n'
@@ -336,7 +336,7 @@ class Query(object):
         if modality:
             for ii, study in enumerate(stud_list):
                 url = 'modalities?' + self._login_code + \
-                    '&projectCode=' + self.proj_name + '&subjectNo=' + \
+                      '&projectCode=' + self.proj_name + '&subjectNo=' + \
                       subj_id + '&study=' + study
                 output = self._send_request(url).split('\n')
 
@@ -383,8 +383,8 @@ class Query(object):
         The choice of a dict as output can be reconsidered.
         """
         url = 'series?' + self._login_code + '&projectCode=' + \
-            self.proj_name + '&subjectNo=' + \
-            subj_id + '&study=' + study + '&modality=' + modality
+              self.proj_name + '&subjectNo=' + \
+              subj_id + '&study=' + study + '&modality=' + modality
         output = self._send_request(url)
 
         # Split at '\n'
@@ -540,7 +540,7 @@ class Query(object):
         if study_metas is not None and isinstance(study_metas, dict):
             # do some checking here...
             try:
-                meta_str += 'studymetas[{:s}]={:s}${:d}&'.\
+                meta_str += 'studymetas[{:s}]={:s}${:d}&'. \
                     format(study_metas['name'],
                            study_metas['comparison'],
                            study_metas['value'])
@@ -557,7 +557,7 @@ class Query(object):
               self.proj_name + '&subjects=' + subjects_str + '&studies=' + \
               studies + '&modalities=' + modalities_str + \
               '&types=' + types + '&anyWithType=' + anywithtype + \
-              '&description=' + description_str + '&excluded=' + excluded +\
+              '&description=' + description_str + '&excluded=' + excluded + \
               '&' + meta_str + outp + '&removeProjects=' + removeProjects
         output = self._send_request(url)
 
@@ -586,7 +586,7 @@ class Query(object):
             info_dict_list = [
                 s for s in info_dict_list
                 if s['study'][:8] >= study_date_range[0]
-                and s['study'][:8] <= study_date_range[1]
+                   and s['study'][:8] <= study_date_range[1]
             ]
         return (info_dict_list)
 
@@ -595,7 +595,6 @@ class Query(object):
 
 
 if __name__ == '__main__':
-
     project_code = 'MEG_service'
 
     Q = Query(proj_name=project_code)
