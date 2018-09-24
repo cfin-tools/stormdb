@@ -266,6 +266,7 @@ class ClusterJob(object):
         if working_dir is not None and isinstance(working_dir, string_types):
             if working_dir == 'cwd':
                 cwd_flag = '#$ -cwd'
+                working_dir = os.getcwd()  # NB replace with real path to cwd
             else:
                 enforce_path_exists(working_dir)
                 cwd_flag = '#$ -wd {:s}'.format(working_dir)
