@@ -70,7 +70,7 @@ class MNEPython(ClusterBatch):
 
         # NB Since mne-python 0.15, fname=None is deprecated and removed here
         script = ("from mne import setup_source_space, write_source_spaces;"
-                  "src = setup_source_space('{subject:s}', {kwargs:});"
+                  "src = setup_source_space('{subject:s}'{kwargs:});"
                   "write_source_spaces(fname='{src_fname:s}', src=src)")
         filtargs = ', '.join("{!s}={!r}".format(key, val) for
                              (key, val) in kwargs.items())
