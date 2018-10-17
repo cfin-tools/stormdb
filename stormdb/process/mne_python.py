@@ -68,11 +68,9 @@ class MNEPython(ClusterBatch):
         if not check_destination_writable(src_fname):
             raise IOError('Output file {0} not writable!'.format(src_fname))
 
-        # NB Deprecation warning! after mne-python 0.15, the fname=None should
-        # probably be removed
+        # NB Since mne-python 0.15, fname=None is deprecated and removed here
         script = ("from mne import setup_source_space, write_source_spaces;"
-                  "src = setup_source_space('{subject:s}', "
-                  "fname=None{kwargs:});"
+                  "src = setup_source_space('{subject:s}', {kwargs:});"
                   "write_source_spaces(fname='{src_fname:s}', src=src)")
         filtargs = ', '.join("{!s}={!r}".format(key, val) for
                              (key, val) in kwargs.items())
