@@ -382,7 +382,7 @@ class Query(object):
 
         return (stud_list)
 
-   def get_study_info(self, subj_id, study):
+    def get_study_info(self, subj_id, study):
         """Get all (non-sensitive) information associated with subject
 
         Parameters
