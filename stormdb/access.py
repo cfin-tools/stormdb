@@ -300,6 +300,35 @@ class Query(object):
 
         return (subj_list)
 
+    def get_subject_info(self, subj_id):
+        """Get all (non-sensitive) information associated with subject
+
+        Parameters
+        ----------
+        subj_id : str
+            A string uniquely identifying a subject in the database.
+            For example: '0001_ABC'
+    
+        Returns
+        -------
+        info_dict : dict
+            Key-value pairs from database
+        """
+        url = 'subjectinfo?' + self._login_code + \
+              '&projectCode=' + self.proj_name + '&subjectNo=' + subj_id
+        output = self._send_request(url)
+
+        # Split at '\n'
+        info_list = output.split('\n')
+        # Remove any empty entries!
+        info_list = [x for x in info_list if x]
+        # create a 2D list with series name (as string)
+        # in 1st column and numerical index (also as string) in 2nd column
+        info_list_2d = [x.split('$') for x in info_list]
+        info_dict = {key: value for key, value in info_list_2d}
+
+        return (info_dict)
+
     def get_studies(self, subj_id, modality=None, unique=False):
         """Get list of studies from database for specified subject
 
