@@ -425,6 +425,8 @@ class Query(object):
         """
         if type(series) is int:
             series = str(series)
+        elif type(series) is list:
+            raise TypeError('series must be a string or an int, not a list!')
 
         url = 'files?' + self._login_code + '&projectCode=' + \
               self.proj_name + '&subjectNo=' + subj_id + '&study=' + \
