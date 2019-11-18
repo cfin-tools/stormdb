@@ -154,8 +154,12 @@ class Query(object):
                     msg = ('Invalid username or wrong password!')
                 elif response.find('The project does not exist') != -1:
                     msg = ('The project ID/code used ({0}) '
-                           'does not exist in the database, please '
-                           'check.'.format(self.proj_name))
+                           'does not exist in the database'
+                           '.'.format(self.proj_name))
+                elif response.find('You are not allowed to view this '
+                                   'project') != -1:
+                    msg = ("You do not have access to the project "
+                           "'{0}'".format(self.proj_name))
                 else:
                     msg = ('StormDB reports error "{0}", not sure what to do '
                            'about it.'.format(response))
@@ -307,7 +311,7 @@ class Query(object):
         subj_id : str
             A string uniquely identifying a subject in the database.
             For example: '0001_ABC'
-    
+
         Returns
         -------
         info_dict : dict
