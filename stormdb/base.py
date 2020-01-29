@@ -16,7 +16,10 @@ def check_destination_exists(dest):
 
 
 def check_destination_writable(dest):
-    return os.access(dest, os.W_OK)
+    if (not check_destination_exists(dest)
+            and os.access(os.path.dirname(dest), os.W_OK)):
+        return True
+    return False  # don't bother checking for writability if exists
 
 
 def check_source_readable(source):
