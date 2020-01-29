@@ -14,7 +14,7 @@ import subprocess as subp
 import re
 import math
 from six import string_types
-from os.path import expanduser
+from os.path import expanduser, basename
 from .access import Query
 from .base import enforce_path_exists
 
@@ -103,10 +103,10 @@ class Cluster(object):
         if queue not in self.queues:
             raise ValueError('Unknown queue: {:s}'.format(queue))
 
-        lim = self._query('qconf -sq ' + queue +
-                          '| grep h_vmem | awk {\'print $2\'}')[0]
+        lim = self._query('qconf -sq ' + queue + (
+            '| grep h_vmem | awk {\'print $2\'}'))[0]
 
-        _, lim_int, lim_units = re.split('(\d+)', lim)
+        _, lim_int, lim_units = re.split(r'(\d+)', lim)
         assert isinstance(int(lim_int), int)
         assert isinstance(lim_units, string_types)
 
@@ -114,8 +114,8 @@ class Cluster(object):
 
     def _check_parallel_env(self, queue, pe_name):
         """Check that a PE is in the pe_list for a given queue"""
-        pes = self._query('qconf -sq ' + queue +
-                          '| grep pe_list')[0]  # just one line
+        pes = self._query('qconf -sq ' + queue + (
+                          '| grep pe_list'))[0]  # just one line
         pe_list = pes.split()[1:]
         if pe_name not in pe_list:
             raise ValueError('Queue \'{0}\' does not support the \'{1}\' '
@@ -238,14 +238,14 @@ class ClusterJob(object):
                     'Maximum number of parallel threads is one (1) when total '
                     'memory consumption is specified.')
             # XXX would be nice with some sanity checking here...
-            _, totmem, totmem_unit = re.split('(\d+)', self.total_memory)
-            _, memlim, memlim_unit = re.split('(\d+)', h_vmem)
+            _, totmem, totmem_unit = re.split(r'(\d+)', self.total_memory)
+            _, memlim, memlim_unit = re.split(r'(\d+)', h_vmem)
 
             if totmem_unit != memlim_unit:
                 units = dict(k=1e3, m=1e6, g=1e9, t=1e12)
                 try:
                     ratio = units[totmem_unit.lower()] /\
-                                units[memlim_unit.lower()]
+                        units[memlim_unit.lower()]
                 except KeyError:
                     raise ValueError('Something is wrong with the memory units'
                                      ', likely {:s}'.format(self.total_memory))
@@ -260,7 +260,9 @@ class ClusterJob(object):
             opt_threaded_flag = "#$ -pe threaded {:d}".format(self.n_threads)
 
         if job_name is None:
-            job_name = 'py-wrapper'
+            # self._cmd may have multiple \n-separated commands: take 1st
+            # basename followed by 0 or more spaces with arguments (ditch)
+            job_name = basename(self._cmd.split('\n')[0]).split(' ')[0]
         log_name_prefix = job_name
 
         if working_dir is not None and isinstance(working_dir, string_types):
@@ -308,9 +310,9 @@ class ClusterJob(object):
     def _create_qsub_script(self, job_name, cwd_flag, opt_threaded_flag,
                             opt_h_vmem_flag, log_name_prefix):
         """All variables should be defined"""
-        if (self.cmd is None or self.queue is None or job_name is None
-                or cwd_flag is None or opt_threaded_flag is None
-                or opt_h_vmem_flag is None):
+        if (self.cmd is None or self.queue is None or job_name is None or
+            cwd_flag is None or opt_threaded_flag is None or
+                opt_h_vmem_flag is None):
             raise ValueError('This should not happen, please report an Issue!')
 
         self._qsub_script =\
@@ -365,7 +367,7 @@ class ClusterJob(object):
         else:
             # py2-3 safety
             output = output.decode('ascii', 'ignore').rstrip()
-            m = re.search('(\d+)', output)
+            m = re.search(r'(\d+)', output)
             self._jobid = m.group(1)
             if self._cleanup_qsub_job:
                 self._delete_qsub_job()
@@ -385,8 +387,8 @@ class ClusterJob(object):
                                      ' | awk \'{print $5, $8}\'')[0]  # ONLY
 
         if len(output) == 0:
-            if (self._submitted and not self._running and not self._completed
-                    and not self._waiting):
+            if (self._submitted and not self._running and not
+                    self._completed and not self._waiting):
                 self._status_msg = ('Submission failed, see log for'
                                     ' output errors!')
             elif self._submitted and not self._completed:
@@ -483,8 +485,8 @@ class ClusterBatch(object):
     def kill(self, jobid=None):
         """Kill (delete) all the jobs in the batch."""
         for job in self._joblist:
-            if (jobid is None
-                    or (jobid is not None and int(job._jobid) == int(jobid))):
+            if (jobid is None or (
+                    jobid is not None and int(job._jobid) == int(jobid))):
                 job.kill()
 
     def build_cmd(self):

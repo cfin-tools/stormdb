@@ -29,7 +29,7 @@ if args.project is None:
     try:
         proj_name = environ['MINDLABPROJ']
         if proj_name == 'NA':
-            raise KeyError('Force an error')
+            raise KeyError('MINDLABPROJ not defined')
     except KeyError:
         msg = ('You must specify a project name either by means of the '
                '--project flag or by setting the MINDLABPROJ environment '
@@ -40,8 +40,8 @@ else:
 # basic check of the memory-argument
 if args.total_memory is not None:
     if (not args.total_memory.startswith(
-        tuple('%d' % ii for ii in range(1, 10))) or
-            not args.total_memory.upper().endswith(('M', 'G', 'T'))):
+        tuple('%d' % ii for ii in range(1, 10))) or not
+            args.total_memory.upper().endswith(('M', 'G', 'T'))):
         raise ValueError('Bad memory format: {:s}'.format(args.total_memory))
 
 job = ClusterJob(args.exec_cmd, proj_name=proj_name, n_threads=args.n_threads,

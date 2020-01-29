@@ -106,8 +106,8 @@ class Query(object):
         try:
             with open(os.path.expanduser(self._stormdblogin), 'r') as fid:
                 if self._verbose:
-                    print('Reading login credentials from ' +
-                          self._stormdblogin)
+                    print('Reading login credentials from {:s}'.format(
+                        self._stormdblogin))
                 self._login_code = fid.readline()
         except IOError:
             print('Login credentials not found, please enter them here')
@@ -193,7 +193,7 @@ class Query(object):
 
         try:
             req = requests.get(full_url)
-        except:
+        except ConnectionError:
             print('hyades00 is not responding, it may be down.')
             print('Contact a system administrator for confirmation.')
             raise
@@ -240,12 +240,12 @@ class Query(object):
             raise ValueError(
                 'You can only specify a modality OR a series, not both.')
         type_err = '{} must be a string, not {}.'
-        if (has_modality is not None
-                and not isinstance(has_modality, string_types)):
+        if (has_modality is not None and not
+                isinstance(has_modality, string_types)):
             raise ValueError(
                 type_err.format('has_modality', type(has_modality)))
-        if (has_series is not None
-                and not isinstance(has_series, string_types)):
+        if (has_series is not None and not
+                isinstance(has_series, string_types)):
             raise ValueError(type_err.format('has_series', type(has_series)))
 
         # using 'subjecs' here would return only numeric ID, not code
@@ -278,8 +278,8 @@ class Query(object):
             subj_list = [
                 ser['subjectcode'] for ser in all_series
                 if ser['subjectcode'] not in used and (
-                    used.append(ser['subjectcode']) or True)
-                and ser['subjectcode'] in subj_list
+                    used.append(ser['subjectcode']) or True) and (
+                        ser['subjectcode'] in subj_list)
             ]
             # The following also works, but is slower?
             # pop_inds = []
@@ -297,8 +297,8 @@ class Query(object):
             subj_list = [
                 ser['subjectcode'] for ser in all_series
                 if ser['subjectcode'] not in used and (
-                    used.append(ser['subjectcode']) or True)
-                and ser['subjectcode'] in subj_list
+                    used.append(ser['subjectcode']) or True) and (
+                        ser['subjectcode'] in subj_list)
             ]
 
         return (subj_list)
@@ -618,7 +618,7 @@ class Query(object):
                     format(study_metas['name'],
                            study_metas['comparison'],
                            study_metas['value'])
-            except:
+            except KeyError:
                 print('Problem with study_metas:')
                 print(study_metas)
                 raise
@@ -653,7 +653,7 @@ class Query(object):
                     key_val_pair[1].sort(key=lambda x: os.path.splitext(x)[0])
 
                 elif 'path' in key_val_pair[0]:
-                    m = re.search('\d{3}\.(.+?)/files', key_val_pair[1])
+                    m = re.search(r'\d{3}\.(.+?)/files', key_val_pair[1])
                     info.append(['seriename', m.group(1)])
                 info.append(key_val_pair)
             info_dict = {key: value for (key, value) in info}
@@ -664,8 +664,8 @@ class Query(object):
                 study_date_range = [study_date_range, study_date_range]
             info_dict_list = [
                 s for s in info_dict_list
-                if s['study'][:8] >= study_date_range[0]
-                and s['study'][:8] <= study_date_range[1]
+                if s['study'][:8] >= study_date_range[0] and (
+                    s['study'][:8] <= study_date_range[1])
             ]
         return (info_dict_list)
 
